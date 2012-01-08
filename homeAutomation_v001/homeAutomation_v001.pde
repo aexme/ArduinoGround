@@ -5,7 +5,6 @@
 #undef float
 #undef round
 
-
 //  RF Switch
 //  ****************
 #include <RemoteSwitch.h>
