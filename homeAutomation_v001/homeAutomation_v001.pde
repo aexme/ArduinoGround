@@ -6,10 +6,15 @@
 #undef round
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 //  RF Switch
 //  ****************
 #include <RemoteSwitch.h>
 
+<<<<<<< HEAD
 
 
 //Intantiate a new ActionSwitch remote, use pin 11
@@ -20,13 +25,23 @@ KaKuSwitch kaKuSwitch(8);
 
 //Intantiate a new Blokker remote, also use pin 11 (same transmitter!)
 //BlokkerSwitch blokkerSwitch();
+=======
+//Intantiate a new KaKuSwitch remote, also use pin 11 (same transmitter!)
+KaKuSwitch kaKuSwitch(12);
+ActionSwitch actionSwitch(12);
+
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 //****************************
 
 // RGB 
 //  * SDI - to digital pin 11 (MOSI pin)
 //  * CLK - to digital pin 13 (SCK pin)
 // inslude the SPI library:
+<<<<<<< HEAD
 #include <SPI.h>
+=======
+//#include <SPI.h>
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 
 #define channelCount 6
 
@@ -53,6 +68,24 @@ byte digits = 14;
 byte pulse_width = B00000011;  //0-7 Brightness
 //******************
 
+<<<<<<< HEAD
+=======
+// RF Link
+//*************
+
+boolean sw_state[] = {false, false, false, false};
+
+int akkuspannungpin = 1;   
+int spannung = 1000;       
+int debouncecount = 0;     
+int debouncecount_lim = 6000;  // command 4
+int sw1_up_lim = 580;      // command 5
+int sw2_up_lim = 700;       // command 6
+int sw1_sw2_up_lim = 0;    // command 7
+boolean sw_activ = true;    // command 8
+
+//***********************
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 
 void setup()
 {
@@ -64,13 +97,21 @@ void setup()
   
   // Initialise the IO and ISR
   vw_set_ptt_inverted(true); // Required for DR3100
+<<<<<<< HEAD
   vw_setup(2000);	 // Bits per sec
+=======
+  vw_setup(1000);	 // Bits per sec
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
   vw_rx_start();       // Start the receiver PLL running
   
   
   //   RGB *********
   // initialize SPI:
+<<<<<<< HEAD
   SPI.begin();  
+=======
+  //SPI.begin();  
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
   
   for (int i =0; i<channelCount; i++)
   {
@@ -130,11 +171,69 @@ void setup()
 void loop()
 {
     pollSerialPort();   
+<<<<<<< HEAD
     
+=======
+    pollRFLink();
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 }
 
 //  RF LINK ***************
 
+<<<<<<< HEAD
+=======
+void pollRFLink()
+{
+
+    uint8_t buf[VW_MAX_MESSAGE_LEN];
+    uint8_t buflen = VW_MAX_MESSAGE_LEN;
+
+    if (vw_get_message(buf, &buflen) && buflen > 4) // Non-blocking
+    {
+        Serial.println(buflen, HEX);
+	int i;
+
+	Serial.print("Got: ");
+	
+	    Serial.print(buf[0]);
+	    Serial.print(" ");
+	
+            if(buf[0] == 'B')
+            { // RGB gr B
+
+                byte ch = buf[1];      
+                byte r = buf[2];      
+                byte g = buf[3];      
+                byte b = buf[4];      
+                //setColor(r, g, b, ch, 'A');
+                return;        
+      
+            }else if(buf[0] == 'D') 
+            {// Switch
+                byte sw = buf[1];      
+                byte state = buf[2];  
+                byte g = buf[3];      
+                byte b = buf[4];          
+                setLokalValue('D', sw, state, g, b);
+                return;        
+            }else if(buf[0] == 'Z')
+            {// Command
+                byte gr = buf[1];      
+                byte command = buf[2];      
+                byte byte1 = buf[3];      
+                byte byte2 = buf[4];  
+                //setLokalValue('Z', sw, state);
+                return;        
+            }else
+            {// error
+                return;
+            } 
+
+	Serial.println("");
+    
+  }
+}
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 void rfsend(char *msg){
     //byte counter = 0;
     uint8_t buf[VW_MAX_MESSAGE_LEN];
@@ -143,6 +242,7 @@ void rfsend(char *msg){
     vw_send((uint8_t *)msg, strlen(msg));
     vw_wait_tx(); // Wait until the whole message is gone
     Serial.println("Sent");
+<<<<<<< HEAD
 
     // Wait at most 200ms for a reply
     if (vw_wait_rx_max(700))
@@ -176,14 +276,45 @@ void setSW(byte sw, byte state){
   
   rfsend(msg);
   
+=======
+}
+
+void setSW(byte sw, byte state){  
+  
+  char msg[] = {'D', sw, state, '0', '0', '\0'};
+  rfsend(msg);  
+}
+
+void setLokalValue(char type, byte sw, byte state, byte byte1, byte byte2){  
+  
+   if(type == 'D'){
+     int bigInt = byte2 * 256 + byte1;
+          Serial.println("state");
+     Serial.println(state,HEX);
+       if(sw<'4') sw_state[sw - '0' - 1] = state - '0';
+       else if(sw == '4')    debouncecount_lim = bigInt;
+       else if(sw == '5')    sw1_up_lim = bigInt;   
+       else if(sw == '6')    sw2_up_lim = bigInt;
+       else if(sw == '7')    sw1_sw2_up_lim = bigInt;  
+       else if(sw=='8') sw_activ = ( (byte1 - '0') == true);
+   }
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 }
 
 //  RFSWITCH  *****************
 
 void setRfSw(char ch, byte nr, byte state){
+<<<<<<< HEAD
 
   kaKuSwitch.sendSignal(ch,nr,state);
   
+=======
+  boolean bool_state = false;
+  if((state - '0') == 1) bool_state = true;
+  
+  kaKuSwitch.sendSignal(ch, nr - '0',bool_state);
+
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 }
 
 
@@ -200,7 +331,11 @@ void pollSerialPort() {
         byte r = Serial.read();      
         byte g = Serial.read();      
         byte b = Serial.read(); 
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
         setColor(r, g, b, ch-1, 'A');
         return;        
       
@@ -237,11 +372,19 @@ void pollSerialPort() {
         setRfSw(ch, nr, state);
         return;        
     }else if(data == 'Z'){// Command
+<<<<<<< HEAD
         char gr = Serial.read();      
         byte command = Serial.read();      
         byte state = Serial.read();      
         byte g = Serial.read();  
         readCommand(gr, command);
+=======
+        byte gr = Serial.read();      
+        byte command = Serial.read();      
+        byte byte1 = Serial.read();      
+        byte byte2 = Serial.read();  
+        readCommand(gr, command, byte1, byte2);
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
         return;        
     }else{// error
         
@@ -249,7 +392,11 @@ void pollSerialPort() {
     }   
   }   
 }
+<<<<<<< HEAD
 void readCommand(byte group, byte command) {
+=======
+void readCommand(byte group, byte command, byte byte1, byte byte2) {
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
   
   if (group == 1) // light
   {      
@@ -261,10 +408,51 @@ void readCommand(byte group, byte command) {
         setLight();
       }
   }
+<<<<<<< HEAD
   else if (command == 2) // VFD
   {
                            
   }
+=======
+  else if (group == 2) // VFD
+  {
+                           
+  }
+  else if (group == 'D') // SW
+  {
+      if(command == '0'){
+         char msg[] = {'Z', 'D', '0', '0', '0', '\0'};
+         rfsend(msg);
+      }else if(command == '1'){
+          Serial.print("debouncecount_lim: ");
+            Serial.println(debouncecount_lim, HEX);
+          Serial.print("sw1_up_lim: ");
+            Serial.println(sw1_up_lim, HEX);
+          Serial.print("sw2_up_lim: ");
+            Serial.println(sw2_up_lim, HEX);
+          Serial.print("sw1_sw2_up_lim: ");
+            Serial.println(sw1_sw2_up_lim, HEX); 
+          Serial.print("sw1_activ: ");
+            Serial.println(sw_activ, HEX);
+          Serial.print("spannung: ");
+            Serial.println(spannung, HEX);
+          Serial.print("sw_state0: ");
+            Serial.println(sw_state[0], HEX);
+          Serial.print("sw_state1: ");
+            Serial.println(sw_state[1], HEX);
+          Serial.print("sw_state2: ");
+            Serial.println(sw_state[2], HEX);
+          Serial.print("sw_state3: ");
+            Serial.println(sw_state[3], HEX);       
+      }else if(command == 'Z'){
+         char msg[] = {'Z', 'Z', '0', '0', '0', '\0'};
+         rfsend(msg);
+      }else{ 
+        char msg[] = {'Z', 'D', command, byte1, byte2, '\0'}; 
+        rfsend(msg);
+      } 
+  }
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 }
 
 
@@ -304,7 +492,11 @@ void setLight(){
 
 int digitalPotWrite(byte g) {
   //  send in the address and value via SPI:
+<<<<<<< HEAD
   SPI.transfer(g);
+=======
+  //SPI.transfer(g);
+>>>>>>> 45a51d82630a03174ae9a8453d55a6d37aa2b6b1
 }
 
 //*******************
