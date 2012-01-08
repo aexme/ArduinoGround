@@ -13,10 +13,12 @@
 
 #include <VirtualWire.h>
 
+
 int sw1 = 6; 
 int sw2 = 7;
 int sw3 = 8;
 int sw4 = 9;
+
 
 boolean sw_state[] = {false, false, false, false};
 
@@ -56,8 +58,9 @@ void loop()
 {
     spannung = analogRead(akkuspannungpin);
 
-    if(debouncecount > debouncecount_lim){ debouncecount = 0;
-}
+    if(debouncecount > debouncecount_lim){ 
+      debouncecount = 0;
+    }
   
     if(spannung < sw2_up_lim && debouncecount == 0 && sw_activ ){
       
@@ -85,7 +88,7 @@ void loop()
         rfsend(msg);
         rfsend(msg);
         //digitalWrite(sw2, sw_state[1]);    
-      }
+    }
     
     debouncecount++;
     
@@ -98,18 +101,15 @@ void loop()
     
     if (vw_get_message(buf, &buflen) && buflen > 4) // Non-blocking
     {
-        Serial.println(buflen, HEX);
 	int i;
 	const char *msg = "goodbye";
 
-        digitalWrite(13, true); // Flash a light to show received good message
-	// Message with a good checksum received, dump it.
 	Serial.print("Got: ");
 	
 	    Serial.print(buf[0]);
 	    Serial.print(" ");
 	
-            if(buf[0] == 'D') {//  Switch
+            if(buf[0] == 'D') {// Switch
                 byte sw = buf[1];      
                 byte state = buf[2];  
                 byte g = buf[3];      
@@ -123,8 +123,7 @@ void loop()
                 byte byte2 = buf[4];  
                 readCommand(gr, command, byte1, byte2);
                 return;        
-            }else{// error
-        
+            }else{// error       
                 return;
             } 
 
