@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!-- Editors & translators, please, edit firstcss.en.tmpl, not .html -->
+<html>
+
+<head>
+  <link rel="stylesheet" type="text/css" href="style.css">
+
+<script type="text/javascript"><!--
+
+    function sendRequest(url){
+	var http = null;
+	if (window.XMLHttpRequest) {
+	  http = new XMLHttpRequest();
+	} else if (window.ActiveXObject) {
+	  http = new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	if (http != null) {
+
+	  http.open("GET", url, true);
+	  http.send(null);
+	}
+    }
+
+    function changeText(text){
+	    document.getElementById('title').innerHTML = text;
+    }
+    function getMPDstats()
+    {
+ 	loadXMLDoc('mpd/0/1/1/1/1', 'title');
+	loadXMLDoc('mpd/1/1/1/1/1', 'time');
+    }
+
+    function loadXMLDoc(url, id)
+    {
+      var xmlhttp;
+      if (window.XMLHttpRequest)
+      {// code for IE7+, Firefox, Chrome, Opera, Safari
+	  xmlhttp=new XMLHttpRequest();
+      }
+      else
+      {// code for IE6, IE5
+	  xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+      }
+      xmlhttp.onreadystatechange=function()
+	{
+
+	  if (xmlhttp.readyState==4 && xmlhttp.status==200)
+	  {
+	    document.getElementById(id).innerHTML=xmlhttp.responseText;
+	  }
+	}
+      xmlhttp.open("GET",url,true);
+      xmlhttp.send();
+
+    }
+
+</script>
+
+</head>
+<body onload=getMPDstats()>
+
+<div id="container">
+	<div id="header">
+	      <h1>Control Centauris</h1>
+	</div>
+	<div id="navigation">
+		<ul>
+			<li><a href="index.html">Home</a></li>
+			<li><a href="rf.html">RF</a></li>
+			<li><a href="#">VFD</a></li>
+			<li><a href="#">RGB</a></li>
+		</ul>
+	</div>
+	<div id="content">
+	    		<h2 id = "NowPlaying">
+			<b>Now Playing:</b>
+		</h2>
+<p>
+		<div id = "title">
+			nothing to see
+		</div>
+</p>
+<p>		<div id = "time">
+			nothing to see
+		</div>
+</p>
+	  <button onClick=sendRequest('cmd/D/1/0/0/0')>Switch 1 off</button>
+	  <button onClick=sendRequest('cmd/D/1/1/0/0')>Switch 1 on</button>
+	  <button onClick=sendRequest('cmd/D/2/0/0/0')>Switch 2 off</button>
+	  <button onClick=sendRequest('cmd/D/2/1/0/0')>Switch 2 on</button>	
+	
+	</div>
+	<div id="footer">
+		CopySite name, 20XX
+	</div>
+</div>
+
+</body>
+</html>
