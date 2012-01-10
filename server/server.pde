@@ -13,12 +13,10 @@
 
 #include <VirtualWire.h>
 
-
 int sw1 = 6; 
 int sw2 = 7;
 int sw3 = 8;
 int sw4 = 9;
-
 
 boolean sw_state[] = {false, false, false, false};
 
