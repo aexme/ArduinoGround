@@ -10,6 +10,7 @@ from mpd import (MPDClient, CommandError)
 from socket import error as SocketError
 import SocketServer
 import threading 
+import thread
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -66,6 +67,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	responsePrefix = "HTTP/1.0 200 OK\r\n" #Server:Affixserver/1.0\r\n"
 	self.arduino = self.server.arduino
 	self.mpdclient = self.server.mympdClient
+	self.lock = self.server.lock
 	
 	print self.mpdclient
 	
@@ -111,19 +113,23 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    if len(command) > 6:
 
 		try:
+		    
 		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
-		    self.request.send("cmd sent")	
-		    time.sleep(1)
+		    self.lock.acquire() 
+		    self.request.send("cmd sent")
+		    self.lock.release()
+		    time.sleep(0.1)
 		except:
 		    time.sleep(0)
 		    
 	elif command[1] == "mpd":
 
 	    if(command[2]=="currentsong"):
-		lock.acquire() 
-
+		
+		self.lock.acquire() 
 		mpd_currentSong = self.mpdclient.getCurrentsong()
-		lock.release()
+		time.sleep(0.01)
+		self.lock.release()
 		
 		name = "" 
 		try:
@@ -151,11 +157,13 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    elif(command[2]=="time"):
 		
 		if(command[3] == "0"):
-		    lock.acquire() 
-		    self.mpd_status = self.mpdclient.getStatus()
-		    lock.release()
 		    
-		    track_time = mpd_status['time'].split(':')
+		    self.lock.acquire() 
+		    self.mpd_status = self.mpdclient.getStatus()
+		    time.sleep(0.05)
+		    self.lock.release()
+		    
+		    track_time = self.mpd_status['time'].split(':')
 		    
 		    sec2 = int(track_time[1]) % 60
 		    mm2 = (int(track_time[1]) - sec2) / 60
@@ -189,13 +197,15 @@ def main():
       
       arduino = MyArduino()
       mympdClient = MyMPDClient()
-      
+      lock=thread.allocate_lock()
+
       myServer = TCPServer(("", 8001), MyRequestHandler)
       myServer_thread = threading.Thread(target=myServer.serve_forever)
       myServer_thread.setDaemon(True)
       myServer_thread.start()
       myServer.arduino = arduino
       myServer.mympdClient = mympdClient
+      myServer.lock = lock
       
       print 'Hello, my name is', myServer_thread.getName()
       
