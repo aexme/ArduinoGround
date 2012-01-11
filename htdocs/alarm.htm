@@ -26,8 +26,7 @@
     }
     function getMPDstats()
     {
- 	loadXMLDoc('mpd/currentsong/0/0/0/0', 'title');
-	loadXMLDoc('mpd/time/0/0/0/0', 'time');
+
     }
 
     function loadXMLDoc(url, id)
@@ -57,7 +56,7 @@
 </script>
 
 </head>
-<body onload=getMPDstats()>
+<body onload=getAlarm()>
 
 <div id="container">
 	<div id="header">
@@ -67,28 +66,27 @@
 		<ul>
 			<li><a href="index.html">Home</a></li>
 			<li><a href="rf.html">RF</a></li>
-			<li><a href="alarm.htm">Alarm</a></li>
+			<li><a href="Alarm.htm">Alarm</a></li>
 			<li><a href="#">RGB</a></li>
 		</ul>
 	</div>
 	<div id="content">
-	    		<h2 id = "NowPlaying">
-			<b>Now Playing:</b>
-		</h2>
-<p>
-		<div id = "title">
-			nothing to see
-		</div>
-</p>
-<p>		<div id = "time">
-			nothing to see
-		</div>
-</p>
-	  <button onClick=sendRequest('cmd/D/1/0/0/0')>Switch 1 off</button>
-	  <button onClick=sendRequest('cmd/D/1/1/0/0')>Switch 1 on</button>
-	  <button onClick=sendRequest('cmd/D/2/0/0/0')>Switch 2 off</button>
-	  <button onClick=sendRequest('cmd/D/2/1/0/0')>Switch 2 on</button>	
-	
+	      <p>
+		Uhrzeit<br>
+      
+		<input name="stunden" type="text" size="2" maxlength="2"> : 
+		<input name="minuten" type="text" size="2" maxlength="2">
+		<div>
+		    <input type="checkbox" name="repeat" value="1"> Montag<br>
+		    <input type="checkbox" name="repeat" value="2"> Dienstag<br>
+		    <input type="checkbox" name="repeat" value="4"> Mittwoch<br>
+		    <input type="checkbox" name="repeat" value="8"> Donnerstag<br>
+		    <input type="checkbox" name="repeat" value="16"> Freitag<br>
+		    <input type="checkbox" name="repeat" value="32"> Samstag<br>
+		    <input type="checkbox" name="repeat" value="64"> Sontag<br></div>
+	      </p>
+	      <button onClick=sendRequest()>Neuen Wecker anlegen</button></p>
+
 	</div>
 	<div id="footer">
 		CopySite name, 20XX

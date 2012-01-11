@@ -4,6 +4,7 @@ import socket, os, re
 import sys
 import serial
 import time
+from datetime import datetime
 import pprint
 
 from mpd import (MPDClient, CommandError)
@@ -11,6 +12,7 @@ from socket import error as SocketError
 import SocketServer
 import threading 
 import thread
+import ConfigParser
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -64,12 +66,11 @@ class MyMPDClient():
 class MyRequestHandler(SocketServer.BaseRequestHandler):
 
     def handle(self):
+      
 	responsePrefix = "HTTP/1.0 200 OK\r\n" #Server:Affixserver/1.0\r\n"
 	self.arduino = self.server.arduino
 	self.mpdclient = self.server.mympdClient
 	self.lock = self.server.lock
-	
-	print self.mpdclient
 	
 	data = self.request.recv(100)
 	
@@ -80,6 +81,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	re5='((?:[a-z][a-z]+))'
 	rg = re.compile(re1+re2+re3+re4+re5,re.IGNORECASE|re.DOTALL)
 	m = rg.search(data)
+	
 	splitURL = data.split(' ')
 	command = splitURL[1].split('/')
 	
@@ -93,59 +95,41 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	  
 	if command[1] == "":
 	    command[1] = "index.html"	    
-	
-	if os.path.exists("/home/aex/sketchbook/htdocs/" + command[1]):
-	      print "+ Attempting to serve "+ unixpath1 +"\n"
-	      file = open("/home/aex/sketchbook/htdocs/"  + command[1], "r")
-	      
-	      self.request.send( responsePrefix )
-	      self.request.send("Content-Type: text/html\r\n")
-	      # send file in 1024 byte chunks
-	      while 1:
-		  data = file.read(1024)
-		  if not data:
-		      break
-		  time.sleep(0.05)
-		  self.request.sendall( data )
-			
-	elif command[1] == "cmd":
+		
+	if command[1] == "cmd":
 	    print "+ Attempting to send cmd "+ unixpath1 +"\n"
 	    if len(command) > 6:
 
 		try:
-		    
 		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
 		    self.lock.acquire() 
 		    self.request.send("cmd sent")
 		    self.lock.release()
-		    time.sleep(0.1)
+		    time.sleep(0.1)		    
 		except:
 		    time.sleep(0)
 		    
 	elif command[1] == "mpd":
 
 	    if(command[2]=="currentsong"):
-		
 		self.lock.acquire() 
 		mpd_currentSong = self.mpdclient.getCurrentsong()
-		time.sleep(0.01)
+		time.sleep(0.02)
 		self.lock.release()
 		
 		name = "" 
-		try:
-		    name = mpd_currentSong['artist']		      
+		try:	    
+		    name = mpd_currentSong['artist']
 		except:
 		    print "Failed to connect on"
 		try:
 		    name = mpd_currentSong['name']		      
 		except:
 		    print "Failed to connect on"
-		    
-		    
+		    		    
 		if(command[3]=='0'):
 		    s = '<div id ="title">' + mpd_currentSong['title'] + '</div></br><div id = "name">' + name + "</div>"
-		    print "+ Attempting to send mpdStats " + s +"\n"
-		    
+		    print "+ Attempting to send mpdStats " + s +"\n"    
 		elif(command[3]=="1"):
 		    s = name
 		    print "+ Attempting to send mpdStats "+ s +"\n"
@@ -153,14 +137,13 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		elif(command[3]=="2"):
 		    s = mpd_currentSong['title']
 		    print "+ Attempting to send mpdStats "+ s +"\n"
-		    
-	    elif(command[2]=="time"):
 		
+	    elif(command[2]=="time"):
 		if(command[3] == "0"):
-		    
-		    self.lock.acquire() 
+
+		    self.lock.acquire()
 		    self.mpd_status = self.mpdclient.getStatus()
-		    time.sleep(0.05)
+		    time.sleep(0.02)
 		    self.lock.release()
 		    
 		    track_time = self.mpd_status['time'].split(':')
@@ -172,6 +155,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 
 		    s = "%.2d" % mm1 + ":" + "%.2d" % sec1 + " / " + "%.2d" % mm2 + ":" + "%.2d" % sec2
 		    print "+ Attempting to send mpdStats "+ s +"\n"
+		    
 		elif(command[3]=="1"): 
 		    s = mpd_status['time']		      
 		    print "+ Attempting to send mpdStats "+ s +"\n"
@@ -180,8 +164,21 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		    s = mpd_status['elapsed']
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		  
-	    self.request.send(s)	
-
+	    self.request.send(s)
+	    
+	elif os.path.exists("/home/aex/sketchbook/htdocs/" + command[1]):
+	      print "+ Attempting to serve "+ unixpath1 +"\n"
+	      file = open("/home/aex/sketchbook/htdocs/"  + command[1], "r")
+	      
+	      self.request.send( responsePrefix )
+	      self.request.send("Content-Type: text/html\r\n")
+	      # send file in 1024 byte chunks
+	      while 1:
+		  data = file.read(1024)
+		  if not data:
+		      break
+		  time.sleep(0.01)
+		  self.request.sendall( data )		
 	else:
 		print "+ File was not found!\n"
 		self.request.send("<html><head><title>404</title></head><body><h1>404 File not Found</h1><br />The file you requested was not found on the server<hr /><small>Affix’ Simple Python HTTP Server 0.0.1</small></body></html>")
@@ -207,8 +204,8 @@ def main():
       myServer.mympdClient = mympdClient
       myServer.lock = lock
       
-      print 'Hello, my name is', myServer_thread.getName()
-      
+      setAlarm("1", 1326234538.77)
+      print readAlarm("1")
       while True:
 	print "still serving"
 	eingabe = raw_input("> ") 
@@ -239,5 +236,26 @@ def mpdAuth(client, secret):
         return False
     return True
 
+def setAlarm(nr, start, repeat):
+    config = ConfigParser.RawConfigParser()
+    config.add_section(nr)
+    config.set(nr, 'start', tstamp)
+    config.set(nr, 'repeat', tstamp)
+    
+    # Writing our configuration file to 'example.cfg'
+    with open('alarm.cfg', 'wb') as configfile:
+	config.write(configfile)
+
+def readAlarm(nr):
+  
+  config = ConfigParser.RawConfigParser()
+  config.read('alarm.cfg')
+
+  start = config.getfloat(nr, 'start')
+  repeat = config.getfloat(nr, 'repeat')
+
+  return (str(start) + ";" + str(repeat)) 
+
+  
 if __name__ == "__main__":
     main()
