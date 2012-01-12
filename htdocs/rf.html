@@ -7,23 +7,16 @@
 <script type="text/javascript">
 
   function ausgabe(state)
-  /* Funktion uebertraegt Auswahltext in Textfeld */
   {
-      /* Auswahlindex der Selectbox ermitteln: */
     var channel_number=document.demo.channel.selectedIndex;
     var number_number=document.demo.number.selectedIndex;
     if ((channel_number<0)||(channel_number>=document.demo.number.options.length))
-      /* wenn Auswahlindex im ungueltigen Bereich */
-    {
-      /* "keine Auswahl" in Textfeld schreiben */
-    }
+    {}
     else
-      /* ansonsten*/
     {
-      /* Auswahltext ermitteln : */
       var channel=document.demo.channel.options[channel_number].text;
       var number=document.demo.number.options[number_number].text;    
-  /* Auswahltext in Textfeld uebertragen : */
+
       sendRequest('cmd/E/' + channel+ '/' + number + '/' + state +'/0');
     }
   }
@@ -79,7 +72,7 @@
 		<ul>
 			<li><a href="index.html">Home</a></li>
 			<li><a href="rf.html">RF</a></li>
-			<li><a href="Alarm.htm">Alarm</a></li>
+			<li><a href="alarm.htm">Alarm</a></li>
 			<li><a href="#">RGB</a></li>
 		</ul>
 	</div>

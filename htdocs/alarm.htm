@@ -5,53 +5,43 @@
 <head>
   <link rel="stylesheet" type="text/css" href="style.css">
 
-<script type="text/javascript"><!--
+  <script type="text/javascript">
 
-    function sendRequest(url){
-	var http = null;
-	if (window.XMLHttpRequest) {
-	  http = new XMLHttpRequest();
-	} else if (window.ActiveXObject) {
-	  http = new ActiveXObject("Microsoft.XMLHTTP");
-	}
-	if (http != null) {
-
-	  http.open("GET", url, true);
-	  http.send(null);
-	}
-    }
-
-    function changeText(text){
-	    document.getElementById('title').innerHTML = text;
-    }
-    function getMPDstats()
-    {
-
-    }
-
-    function loadXMLDoc(url, id)
-    {
-      var xmlhttp;
-      if (window.XMLHttpRequest)
-      {// code for IE7+, Firefox, Chrome, Opera, Safari
-	  xmlhttp=new XMLHttpRequest();
-      }
-      else
-      {// code for IE6, IE5
-	  xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
-      }
-      xmlhttp.onreadystatechange=function()
-	{
-
-	  if (xmlhttp.readyState==4 && xmlhttp.status==200)
-	  {
-	    document.getElementById(id).innerHTML=xmlhttp.responseText;
+      function sendRequest(url){
+	  var http = null;
+	  if (window.XMLHttpRequest) {
+	    http = new XMLHttpRequest();
+	  } else if (window.ActiveXObject) {
+	    http = new ActiveXObject("Microsoft.XMLHTTP");
 	  }
-	}
-      xmlhttp.open("GET",url,true);
-      xmlhttp.send();
+	  if (http != null) {
 
-    }
+	    http.open("GET", url, true);
+	    http.send(null);
+	  }
+      }
+      function setalarm()
+      {
+	  repeatValue = 0;
+
+	  for (i = 0; i < document.setAlarm.repeat.length; i++) {
+	      if (document.setAlarm.repeat[i].checked == true){
+		  repeatValue += parseInt(document.setAlarm.repeat[i].value);
+	      }
+	  } 
+	  var name = document.setAlarm.name.value;
+	  var hour = document.setAlarm.stunden.value;
+	  var minute = document.setAlarm.minuten.value;
+	  
+	  unixtime = parseInt(hour) * 3600 + parseInt(minute) * 60;
+      
+	  sendRequest('alarm/set/' + name + '/' + unixtime + '/' + repeatValue + '/1');
+
+      }
+      function getAlarm()
+      {
+	loadXMLDoc('alarm/get/0/0/0/0', 'title');	
+      }
 
 </script>
 
@@ -71,11 +61,17 @@
 		</ul>
 	</div>
 	<div id="content">
+	      <p name="timer">
+		  alarm1: 10:12 64 <input type="checkbox" name="timerEnabled" value="1"><br>
+		  alarm1: 10:12 64 <input type="checkbox" name="timerEnabled" value="1"><br>
+	      </p>
+<form name="setAlarm">
 	      <p>
-		Uhrzeit<br>
-      
+		Uhrzeit 
+		
 		<input name="stunden" type="text" size="2" maxlength="2"> : 
-		<input name="minuten" type="text" size="2" maxlength="2">
+		<input name="minuten" type="text" size="2" maxlength="2"><br>
+		Alarm Name <input name="name" type="text" size="10" maxlength="10">
 		<div>
 		    <input type="checkbox" name="repeat" value="1"> Montag<br>
 		    <input type="checkbox" name="repeat" value="2"> Dienstag<br>
@@ -85,7 +81,8 @@
 		    <input type="checkbox" name="repeat" value="32"> Samstag<br>
 		    <input type="checkbox" name="repeat" value="64"> Sontag<br></div>
 	      </p>
-	      <button onClick=sendRequest()>Neuen Wecker anlegen</button></p>
+</form>
+	      <button onClick="setalarm()">Neuen Wecker anlegen</button></p>
 
 	</div>
 	<div id="footer">

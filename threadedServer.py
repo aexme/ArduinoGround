@@ -13,6 +13,7 @@ import SocketServer
 import threading 
 import thread
 import ConfigParser
+import csv
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -21,7 +22,6 @@ PASSWORD = False
 CON_ID = {'host':HOST, 'port':PORT}
 
 class MyArduino():
-  
     def __init__(self):
 	locations=['/dev/ttyUSB0','/dev/ttyUSB1','/dev/ttyUSB2','/dev/ttyUSB3',
 	    '/dev/ttyS0','/dev/ttyS1','/dev/ttyS2','/dev/ttyS3']
@@ -36,7 +36,50 @@ class MyArduino():
 	
     def write(self, text):
       self.arduino.write(text)
-      
+
+class MyTimer():
+    def __init__(self):
+	self.config = ConfigParser.RawConfigParser()
+	self.config.read('alarm.cfg')
+	self.timerCount = self.config.getint('main', 'timerCount')
+	self.timerList = []
+	print self.timerCount
+	
+	self.config.walk
+	
+	if (self.timerCount > 1):
+	    i = 1
+	    while i < self.timerCount:
+		self.timerList.append(self.config.get('main', 'timer' + str(i)))
+		i += 1
+	  
+    def updateTimerList(self):
+	self.config.read('alarm.cfg')
+	self.timerCount = self.config.getint('main', 'timerCount')
+	self.timerList = []
+	if (self.timerCount > 1):
+	    i = 0
+	    while i < self.timerCount:
+		self.timerList.append(self.config.get('main', 'timer' + str(i)))
+		i += 1
+		
+    def getTimer(self):
+	return self.timerList
+	
+    def addTimer(self, timer):
+	self.config.set('main', 'timer' + str(self.timerCount + 1), timer)
+	self.timerCount += 1
+	self.config.set('main', 'timerCount', self.timerCount)
+	
+    def writeConfig(self):
+	with open('alarm.cfg', 'wb') as configfile:
+	    self.config.write(configfile)
+    
+    def deleteTimer(self, timer):
+	self.config.remove_section(timer)
+	self.timer
+	
+
 class MyMPDClient():
     def __init__(self):
 	## MPD object instance
@@ -109,6 +152,18 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		except:
 		    time.sleep(0)
 		    
+	elif command[1] == "alarm":
+	    if(command[2] == "set"):
+		setAlarm(command[3], command[4], command[6], command[5]) 
+		self.request.send("OK")
+	    elif(command[2] == "get"):
+		timer = readAlarm(command[3])
+		timerSplit=timer.split(';')
+		timerEnabled='false'
+		if(timerSplit[2]=="1"):
+		    timerEnabled='true'
+		s = command[3] + ": " + timerSplit[0] + " " + timerSplit[1] + ' <input type="checkbox" name="timerEnabled" value="1" checked="' + timerEnabled + '"><br>' 
+		
 	elif command[1] == "mpd":
 
 	    if(command[2]=="currentsong"):
@@ -204,10 +259,10 @@ def main():
       myServer.mympdClient = mympdClient
       myServer.lock = lock
       
-      setAlarm("1", 1326234538.77)
-      print readAlarm("1")
+      timer = MyTimer()
+      
       while True:
-	print "still serving"
+	print "still serving" 
 	eingabe = raw_input("> ") 
 	if eingabe == "en": 
 	    break 
@@ -235,27 +290,6 @@ def mpdAuth(client, secret):
     except CommandError:
         return False
     return True
-
-def setAlarm(nr, start, repeat):
-    config = ConfigParser.RawConfigParser()
-    config.add_section(nr)
-    config.set(nr, 'start', tstamp)
-    config.set(nr, 'repeat', tstamp)
-    
-    # Writing our configuration file to 'example.cfg'
-    with open('alarm.cfg', 'wb') as configfile:
-	config.write(configfile)
-
-def readAlarm(nr):
-  
-  config = ConfigParser.RawConfigParser()
-  config.read('alarm.cfg')
-
-  start = config.getfloat(nr, 'start')
-  repeat = config.getfloat(nr, 'repeat')
-
-  return (str(start) + ";" + str(repeat)) 
-
   
 if __name__ == "__main__":
     main()
