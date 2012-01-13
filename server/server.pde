@@ -21,11 +21,11 @@ int sw4 = 9;
 boolean sw_state[] = {false, false, false, false};
 
 int akkuspannungpin = 1;   
-int spannung = 1000;       
+int spannung = 1020;       
 int debouncecount = 0;     
-int debouncecount_lim = 800;  // command 4
-int sw1_up_lim = 1000;      // command 5
-int sw2_up_lim = 1000;       // command 6
+int debouncecount_lim = 5000;  // command 4
+int sw1_up_lim = 1022;      // command 5
+int sw2_up_lim = 1022;       // command 6
 int sw1_sw2_up_lim = 0;    // command 7
 boolean sw_activ = true;    // command 8
 
@@ -46,10 +46,10 @@ void setup()
     digitalWrite(sw2, HIGH); 
     
     pinMode(sw3, OUTPUT);     
-    digitalWrite(sw3, HIGH);
+    digitalWrite(sw3, LOW);
     
     pinMode(sw4, OUTPUT);
-    digitalWrite(sw4, HIGH);
+    digitalWrite(sw4, LOW);
 }
 
 void loop()
@@ -58,6 +58,7 @@ void loop()
 
     if(debouncecount > debouncecount_lim){ 
       debouncecount = 0;
+      Serial.println(spannung);
     }
   
     if(spannung < sw2_up_lim && debouncecount == 0 && sw_activ ){
@@ -80,6 +81,7 @@ void loop()
         }
         char tmp = '0';
         digitalWrite(sw1, sw_state[0]);
+        digitalWrite(sw3, !sw_state[0]);
         if(sw_state[0]==true) tmp = '1';
         char msg[] = {'D', '1', tmp, '0', '0', '\0'};
 
@@ -135,7 +137,7 @@ void setSW(byte sw, byte state){
   if(state > '1'){
    if(state < '0') return;
   }  
-  if(sw > '4'){
+  if(sw > '2'){
    if(sw < '1') return;
   }  
   
@@ -145,7 +147,7 @@ void setSW(byte sw, byte state){
   sw_state[sw-1] = stat;
 
   digitalWrite(sw + 5, sw_state[sw - 1]);
-  
+  digitalWrite(sw + 7, !sw_state[sw - 1]);
 }
 
 void readCommand(byte group, byte command, byte byte1, byte byte2) {
