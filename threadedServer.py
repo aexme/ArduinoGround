@@ -39,46 +39,52 @@ class MyArduino():
 
 class MyTimer():
     def __init__(self):
-	self.config = ConfigParser.RawConfigParser()
-	self.config.read('alarm.cfg')
-	self.timerCount = self.config.getint('main', 'timerCount')
-	self.timerList = []
-	print self.timerCount
+	self.timerList = {}
+	self.loadTimer()
 	
-	self.config.walk
-	
-	if (self.timerCount > 1):
-	    i = 1
-	    while i < self.timerCount:
-		self.timerList.append(self.config.get('main', 'timer' + str(i)))
-		i += 1
-	  
     def updateTimerList(self):
-	self.config.read('alarm.cfg')
-	self.timerCount = self.config.getint('main', 'timerCount')
-	self.timerList = []
-	if (self.timerCount > 1):
-	    i = 0
-	    while i < self.timerCount:
-		self.timerList.append(self.config.get('main', 'timer' + str(i)))
-		i += 1
-		
-    def getTimer(self):
-	return self.timerList
+	self.loadTimer()
 	
+    def loadTimer(self):
+	timerFile = open('alarm.cfg', 'r')
+
+	for line in timerFile:
+	    timerLine = line.split(';')
+	    if (line!=''):
+		self.timerList[timerLine[0]] = line
+		
+	timerFile.close()
+	
+    def getTimer(self, name=''):
+	if(name == ''): 
+	    return self.timerList
+	else:	
+	    return self.timerList[name]
+
     def addTimer(self, timer):
-	self.config.set('main', 'timer' + str(self.timerCount + 1), timer)
-	self.timerCount += 1
-	self.config.set('main', 'timerCount', self.timerCount)
+	timerSplit = timer.split(';')
+	self.timerList[timerSplit[0]] = timer
 	
     def writeConfig(self):
-	with open('alarm.cfg', 'wb') as configfile:
-	    self.config.write(configfile)
+	timerFile = open('alarm.cfg', 'w')
+	for name, line in self.timerList.iteritems():
+	    if (line == ' ' or line == "\n" or line == '' ):
+		print "not again!"
+	    else: timerFile.write(line + '\n')
     
     def deleteTimer(self, timer):
-	self.config.remove_section(timer)
-	self.timer
+	del self.timerList[timer]
 	
+    def flipTimer(self, timer):
+	myTimer = self.timerList[timer]
+	myTimerSplit = myTimer.split(';')
+
+	if (myTimerSplit[3] == '0' ): 
+	    myTimerSplit[3] = '1'	    
+	else:  
+	    myTimerSplit[3] = '0'
+	    
+	self.timerList[timer] = ';'.join(myTimerSplit)
 
 class MyMPDClient():
     def __init__(self):
@@ -114,6 +120,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	self.arduino = self.server.arduino
 	self.mpdclient = self.server.mympdClient
 	self.lock = self.server.lock
+	self.timer = self.server.timer
 	
 	data = self.request.recv(100)
 	
@@ -127,49 +134,113 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	
 	splitURL = data.split(' ')
 	command = splitURL[1].split('/')
-	
+	self.unixpath1=''
 	if m:
 	    word1=m.group(1)
-	    unixpath1=m.group(2)
+	    self.unixpath1=m.group(2)
 	    word2=m.group(3)
-	    print "("+word1+")"+"("+unixpath1+")"+"("+word2+")"+"\n"
-	    if unixpath1 == "/1.1":
-		unixpath1 = "/index.html"      
+	    print "("+word1+")"+"("+self.unixpath1+")"+"("+word2+")"+"\n"
+	    if self.unixpath1 == "/1.1":
+		self.unixpath1 = "/index.html"      
 	  
 	if command[1] == "":
 	    command[1] = "index.html"	    
 		
 	if command[1] == "cmd":
-	    print "+ Attempting to send cmd "+ unixpath1 +"\n"
+	    print "+ Attempting to send cmd "+ self.unixpath1 +"\n"
 	    if len(command) > 6:
 
 		try:
-		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
+		    
 		    self.lock.acquire() 
+		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
 		    self.request.send("cmd sent")
 		    self.lock.release()
-		    time.sleep(0.1)		    
+		    time.sleep(0.01)		    
 		except:
 		    time.sleep(0)
 		    
 	elif command[1] == "alarm":
 	    if(command[2] == "set"):
-		setAlarm(command[3], command[4], command[6], command[5]) 
-		self.request.send("OK")
+		self.lock.acquire() 
+		self.timer.addTimer(command[3] + ';' + command[4] + ';' + command[5] + ';' + command[6])
+		self.timer.writeConfig()
+		self.lock.release()
+		s = "OK"
+	    
+	    elif(command[2] == "rm"):
+		self.lock.acquire() 
+		self.timer.deleteTimer(command[3])
+		self.lock.release()
+		s = "OK"
+	    elif(command[2] == "flip"):
+		self.lock.acquire() 
+		self.timer.flipTimer(command[3])
+		self.timer.writeConfig()
+		self.lock.release()
+		s= "OK"
+		
 	    elif(command[2] == "get"):
-		timer = readAlarm(command[3])
-		timerSplit=timer.split(';')
-		timerEnabled='false'
-		if(timerSplit[2]=="1"):
-		    timerEnabled='true'
-		s = command[3] + ": " + timerSplit[0] + " " + timerSplit[1] + ' <input type="checkbox" name="timerEnabled" value="1" checked="' + timerEnabled + '"><br>' 
+		self.timerList = self.timer.getTimer()
+		s=' '
+		
+		for name, line in self.timerList.iteritems():
+		    if (line=="" or line == "\n" or line  == " "):
+		      print "error"
+		    else:
+			timerSplit = line.split(';')
+			
+			hrTime = time.strftime("%H:%M", time.localtime(int(timerSplit[1])))
+			timerEnabled = ''
+
+			if(timerSplit[3].rstrip() == '1'):
+			    timerEnabled = 'checked'		
+			hrRepeat = ''
+			repeatDays = {'Mo': 0, 'Di': 0, 'Mi': 0, 'Do': 0, 'Fr': 0, 'Sa': 0, 'So': 0}			
+			repeat = int(timerSplit[2])
+			
+			if (repeat == 127): hrRepeat = 'Everyday'
+			else:
+			    
+			    if(repeat - 64 >= 0):
+				repeatDays['So'] = 1
+				repeat -=64  
+
+			    if(repeat-32 >= 0):
+				repeatDays['Sa'] = 1
+				repeat -=32
+				
+			    if(repeat-16 >= 0):
+				repeatDays['Fr'] = 1
+				repeat -=16
+			    if(repeat-8 >= 0):
+				repeatDays['Do'] = 1
+				repeat -=8
+			    if(repeat-4 >= 0):
+				repeatDays['Mi'] = 1
+				repeat -=4
+			    if(repeat-2 >= 0):
+				repeatDays['Di'] = 1
+				repeat -=2
+			    if(repeat-1 >= 0):
+				repeatDays['Mo'] = 1
+				repeat -=1
+			    for tag, enabled in repeatDays.iteritems():
+				if(enabled==1): hrRepeat += tag + ','
+				
+			s += timerSplit[0] + ": " + hrTime + " " + hrRepeat
+			s += ' <input type="checkbox" name="timerEnabled" value="1" '
+			s += timerEnabled + " onchange=flipTimer('" + timerSplit[0] + "')"
+			s += "><button onClick=rmTimer('" + timerSplit[0] + "')>delete</button><br>"
+
+	    self.request.send(s)
 		
 	elif command[1] == "mpd":
 
 	    if(command[2]=="currentsong"):
 		self.lock.acquire() 
 		mpd_currentSong = self.mpdclient.getCurrentsong()
-		time.sleep(0.02)
+		time.sleep(0.001)
 		self.lock.release()
 		
 		name = "" 
@@ -198,7 +269,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 
 		    self.lock.acquire()
 		    self.mpd_status = self.mpdclient.getStatus()
-		    time.sleep(0.02)
+		    time.sleep(0.001)
 		    self.lock.release()
 		    
 		    track_time = self.mpd_status['time'].split(':')
@@ -222,7 +293,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    self.request.send(s)
 	    
 	elif os.path.exists("/home/aex/sketchbook/htdocs/" + command[1]):
-	      print "+ Attempting to serve "+ unixpath1 +"\n"
+	      print "+ Attempting to serve "+ self.unixpath1 +"\n"
 	      file = open("/home/aex/sketchbook/htdocs/"  + command[1], "r")
 	      
 	      self.request.send( responsePrefix )
@@ -244,13 +315,31 @@ class TCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     def __init__(self, server_address, RequestHandlerClass):
         self.allow_reuse_address = True
         SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass)	
-        
+
+class myAlarm(threading.Thread):   #deine Threadklasse
+   def __init__(self): #musst du initialisieren
+      threading.Thread.__init__ (self)  #hier reicht die Methode der Threadklasse
+ 
+   def run(self):             # die Methode, die beim Aufruf von start abgearbeitet wird
+
+      arduino = MyArduino()
+      arduino.write('EC310')
+      time.sleep(60)
+      arduino.write('D1000')
+      time.sleep(1)
+      arduino.write('EC300')
+      
+      exit()
+      
+      print "noch daa"
+
 def main():
       
       arduino = MyArduino()
       mympdClient = MyMPDClient()
       lock=thread.allocate_lock()
-
+      timer = MyTimer()
+      
       myServer = TCPServer(("", 8001), MyRequestHandler)
       myServer_thread = threading.Thread(target=myServer.serve_forever)
       myServer_thread.setDaemon(True)
@@ -258,16 +347,27 @@ def main():
       myServer.arduino = arduino
       myServer.mympdClient = mympdClient
       myServer.lock = lock
-      
-      timer = MyTimer()
-      
-      while True:
-	print "still serving" 
-	eingabe = raw_input("> ") 
-	if eingabe == "en": 
-	    break 
+      myServer.timer = timer
 
-	time.sleep(5)
+      while True:
+	
+	    my_timerList = timer.getTimer()
+	    myAlarmTime = []
+	    
+	    for name, mytimer in my_timerList.iteritems():
+		  if (mytimer=="" or mytimer == "\n" or mytimer  == " "):
+		      pass
+		  else:
+		      my_TimerSplit = mytimer.split(';')
+		      if(my_TimerSplit[3].rstrip() == '1'): myAlarmTime.append(my_TimerSplit[1])
+	    for alarmTime in myAlarmTime:
+
+		  if  (time.strftime("%H:%M", time.localtime(int(alarmTime)-300)) == time.strftime("%H:%M", time.localtime())):		            
+		      ma_AlarmThread = myAlarm()
+		      ma_AlarmThread.start()
+		      print 'ALARM'
+
+	    time.sleep(30)
 	
       myServer.shutdown()
 
@@ -290,6 +390,5 @@ def mpdAuth(client, secret):
     except CommandError:
         return False
     return True
-  
 if __name__ == "__main__":
     main()
