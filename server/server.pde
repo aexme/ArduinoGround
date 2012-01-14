@@ -21,11 +21,11 @@ int sw4 = 9;
 boolean sw_state[] = {false, false, false, false};
 
 int akkuspannungpin = 1;   
-int spannung = 1020;       
+int spannung = 1000;       
 int debouncecount = 0;     
-int debouncecount_lim = 5000;  // command 4
-int sw1_up_lim = 1022;      // command 5
-int sw2_up_lim = 1022;       // command 6
+int debouncecount_lim = 2000;  // command 4
+int sw1_up_lim = 1000;      // command 5
+int sw2_up_lim = 1000;       // command 6
 int sw1_sw2_up_lim = 0;    // command 7
 boolean sw_activ = true;    // command 8
 
