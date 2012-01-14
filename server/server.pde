@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // server.pde
 //
 // Simple example of how to use VirtualWire to send and receive messages
@@ -209,3 +210,6 @@ void rfsend(char *msg){
     delay(400);
 }
 
+=======
+ 
+>>>>>>> fb92a8fbf82f211a39100475b0cbc724b6ea6634

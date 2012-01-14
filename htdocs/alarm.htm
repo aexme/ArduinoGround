@@ -4,7 +4,7 @@
 
 <head>
   <link rel="stylesheet" type="text/css" href="style.css">
-
+ 
   <script type="text/javascript">
 
       function sendRequest(url){
@@ -33,15 +33,51 @@
 	  var hour = document.setAlarm.stunden.value;
 	  var minute = document.setAlarm.minuten.value;
 	  
-	  unixtime = parseInt(hour) * 3600 + parseInt(minute) * 60;
+	  unixtime = (parseInt(hour) - 1) * 3600 + parseInt(minute) * 60;
       
-	  sendRequest('alarm/set/' + name + '/' + unixtime + '/' + repeatValue + '/1');
+	  loadXMLDoc('alarm/set/' + name + '/' + unixtime + '/' + repeatValue + '/1', 'status');
+
+	  getAlarm()
 
       }
+      function loadXMLDoc(url, id)
+      {
+	  var xmlhttp;
+	  if (window.XMLHttpRequest)
+	  {// code for IE7+, Firefox, Chrome, Opera, Safari
+	      xmlhttp=new XMLHttpRequest();
+	  }
+	  else
+	  {// code for IE6, IE5
+	      xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+	  }
+	  xmlhttp.onreadystatechange=function()
+	    {
+
+	      if (xmlhttp.readyState==4 && xmlhttp.status==200)
+	      {
+		document.getElementById(id).innerHTML=xmlhttp.responseText;
+	      }
+	    }
+	  xmlhttp.open("GET",url,true);
+	  xmlhttp.send();
+
+      }
+
       function getAlarm()
       {
-	loadXMLDoc('alarm/get/0/0/0/0', 'title');	
+	loadXMLDoc("alarm/get/0/0/0/0", "timer");	
       }
+
+    function rmTimer(timer){
+	loadXMLDoc('alarm/rm/' + timer + '/0/0', 'status');
+	getAlarm();
+    }
+
+    function flipTimer(timer){
+	loadXMLDoc('alarm/flip/' + timer + '/0/0', 'status');
+	getAlarm();
+    }
 
 </script>
 
@@ -49,6 +85,7 @@
 <body onload=getAlarm()>
 
 <div id="container">
+
 	<div id="header">
 	      <h1>Control Centauris</h1>
 	</div>
@@ -56,14 +93,12 @@
 		<ul>
 			<li><a href="index.html">Home</a></li>
 			<li><a href="rf.html">RF</a></li>
-			<li><a href="Alarm.htm">Alarm</a></li>
+			<li><a href="alarm.htm">Alarm</a></li>
 			<li><a href="#">RGB</a></li>
 		</ul>
 	</div>
 	<div id="content">
-	      <p name="timer">
-		  alarm1: 10:12 64 <input type="checkbox" name="timerEnabled" value="1"><br>
-		  alarm1: 10:12 64 <input type="checkbox" name="timerEnabled" value="1"><br>
+	      <p id="timer">
 	      </p>
 <form name="setAlarm">
 	      <p>
@@ -84,6 +119,9 @@
 </form>
 	      <button onClick="setalarm()">Neuen Wecker anlegen</button></p>
 
+	</div>
+	<div id="status">
+		
 	</div>
 	<div id="footer">
 		CopySite name, 20XX
