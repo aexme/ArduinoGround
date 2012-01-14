@@ -373,7 +373,7 @@ def main():
 
 def mpdConnect(client, con_id):
     """
-    Simple wrapper to connect MPD.
+    Simple wrapper to connect MPD .
     """
     try:
         client.connect(**con_id)
