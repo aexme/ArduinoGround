@@ -6,7 +6,7 @@ import serial
 import time
 from datetime import datetime
 import pprint
-
+import datetime
 from mpd import (MPDClient, CommandError)
 from socket import error as SocketError
 import SocketServer
@@ -36,6 +36,9 @@ class MyArduino():
 	
     def write(self, text):
       self.arduino.write(text)
+    
+    def read(self):
+      return self.arduino.readline()
 
 class MyTimer():
     def __init__(self):
@@ -75,6 +78,36 @@ class MyTimer():
     def deleteTimer(self, timer):
 	del self.timerList[timer]
 	
+    def getdecodeRepeatCode(self, repeat):
+	
+	repeatDays = {'Mo': 0, 'Di': 0, 'Mi': 0, 'Do': 0, 'Fr': 0, 'Sa': 0, 'So': 0}
+	
+	if(repeat - 64 >= 0):
+	    repeatDays['So'] = 1
+	    repeat -=64  
+
+	if(repeat-32 >= 0):
+	    repeatDays['Sa'] = 1
+	    repeat -=32
+	    
+	if(repeat-16 >= 0):
+	    repeatDays['Fr'] = 1
+	    repeat -=16
+	if(repeat-8 >= 0):
+	    repeatDays['Do'] = 1
+	    repeat -=8
+	if(repeat-4 >= 0):
+	    repeatDays['Mi'] = 1
+	    repeat -=4
+	if(repeat-2 >= 0):
+	    repeatDays['Di'] = 1
+	    repeat -=2
+	if(repeat-1 >= 0):
+	    repeatDays['Mo'] = 1
+	    repeat -=1
+	    
+	return repeatDays
+	
     def flipTimer(self, timer):
 	myTimer = self.timerList[timer]
 	myTimerSplit = myTimer.split(';')
@@ -108,6 +141,18 @@ class MyMPDClient():
     def getCurrentsong(self):
 	return self.client.currentsong()
 	
+    def pause(self):
+	return self.client.pause()
+    def previous(self):
+	return self.client.previous()
+    def _next(self):
+	return self.client.next()
+    def stop(self):
+	return self.client.stop()
+
+    def play(self):
+	return self.client.play()
+
     def getStatus(self):
 	return self.client.status()
 
@@ -196,35 +241,13 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 			if(timerSplit[3].rstrip() == '1'):
 			    timerEnabled = 'checked'		
 			hrRepeat = ''
-			repeatDays = {'Mo': 0, 'Di': 0, 'Mi': 0, 'Do': 0, 'Fr': 0, 'Sa': 0, 'So': 0}			
+
 			repeat = int(timerSplit[2])
 			
 			if (repeat == 127): hrRepeat = 'Everyday'
-			else:
-			    
-			    if(repeat - 64 >= 0):
-				repeatDays['So'] = 1
-				repeat -=64  
-
-			    if(repeat-32 >= 0):
-				repeatDays['Sa'] = 1
-				repeat -=32
-				
-			    if(repeat-16 >= 0):
-				repeatDays['Fr'] = 1
-				repeat -=16
-			    if(repeat-8 >= 0):
-				repeatDays['Do'] = 1
-				repeat -=8
-			    if(repeat-4 >= 0):
-				repeatDays['Mi'] = 1
-				repeat -=4
-			    if(repeat-2 >= 0):
-				repeatDays['Di'] = 1
-				repeat -=2
-			    if(repeat-1 >= 0):
-				repeatDays['Mo'] = 1
-				repeat -=1
+			elif (repeat == 0): hrRepeat = 'once'
+			else:		
+			    repeatDays = self.timer.getdecodeRepeatCode(repeat)
 			    for tag, enabled in repeatDays.iteritems():
 				if(enabled==1): hrRepeat += tag + ','
 				
@@ -263,7 +286,23 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		elif(command[3]=="2"):
 		    s = mpd_currentSong['title']
 		    print "+ Attempting to send mpdStats "+ s +"\n"
-		
+	    
+	    elif(command[2]=="pause"):
+		self.mpdclient.pause();
+		s='OK'
+	    elif(command[2]=="previous"):
+		self.mpdclient.previous();
+		s='OK'
+  	    elif(command[2]=="next"):
+		self.mpdclient._next();
+		s='OK'
+	    elif(command[2]=="stop"):
+		self.mpdclient.stop();
+		s='OK'
+	    elif(command[2]=="play"):
+		self.mpdclient.play();
+		s='OK'
+
 	    elif(command[2]=="time"):
 		if(command[3] == "0"):
 
@@ -348,26 +387,50 @@ def main():
       myServer.mympdClient = mympdClient
       myServer.lock = lock
       myServer.timer = timer
-
+      
+      weekdayArray = ['Mo','Di','Mi','Do','Fr','Sa','So']
+      myAlarmTime = []
+      
+      counterAlarm=0
+      
       while True:
-	
-	    my_timerList = timer.getTimer()
-	    myAlarmTime = []
 	    
-	    for name, mytimer in my_timerList.iteritems():
-		  if (mytimer=="" or mytimer == "\n" or mytimer  == " "):
-		      pass
-		  else:
-		      my_TimerSplit = mytimer.split(';')
-		      if(my_TimerSplit[3].rstrip() == '1'): myAlarmTime.append(my_TimerSplit[1])
-	    for alarmTime in myAlarmTime:
+	    print arduino.read()
+	    
+	    if(counterAlarm==45):counterAlarm=0
+	    
+	    if(counterAlarm==0):
+		my_timerList = timer.getTimer()
+		
+		for name, mytimer in my_timerList.iteritems():
+		      if (mytimer=="" or mytimer == "\n" or mytimer  == " "):
+			  pass
+		      else:
+			  my_TimerSplit = mytimer.split(';')
+			  if(my_TimerSplit[3].rstrip() == '1'):
+			      today = datetime.date.today()
 
-		  if  (time.strftime("%H:%M", time.localtime(int(alarmTime)-300)) == time.strftime("%H:%M", time.localtime())):		            
-		      ma_AlarmThread = myAlarm()
-		      ma_AlarmThread.start()
-		      print 'ALARM'
+			      weekdayNowInt = today.weekday()
+			      weekdayNowstr = weekdayArray[weekdayNowInt]
+			      repeatDays = timer.getdecodeRepeatCode(int(my_TimerSplit[2]))
+			      if(repeatDays[weekdayNowstr] == 1):
+				  myAlarmTime.append(my_TimerSplit[1])
+			      else:
+				  once = 1
+				  for theweekday, en in repeatDays:
+				      if (en==1): once = 0
+				  if (once == 1): 
+				      myAlarmTime.append(my_TimerSplit[1])
+				      timer.flipTimer(my_TimerSplit[0])
+			      
+		for alarmTime in myAlarmTime:
+		      
+		      if  (time.strftime("%H:%M", time.localtime(int(alarmTime)-300)) == time.strftime("%H:%M", time.localtime())):		            
+			  ma_AlarmThread = myAlarm()
+			  ma_AlarmThread.start()
+			  print 'ALARM'
 
-	    time.sleep(30)
+	    time.sleep(1)
 	
       myServer.shutdown()
 

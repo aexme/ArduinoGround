@@ -17,23 +17,9 @@
       var channel=document.demo.channel.options[channel_number].text;
       var number=document.demo.number.options[number_number].text;    
 
-      sendRequest('cmd/E/' + channel+ '/' + number + '/' + state +'/0');
+      loadXMLDoc('cmd/E/' + channel+ '/' + number + '/' + state +'/0','status');
     }
   }
-
-    function sendRequest(url){
-	var http = null;
-	if (window.XMLHttpRequest) {
-	  http = new XMLHttpRequest();
-	} else if (window.ActiveXObject) {
-	  http = new ActiveXObject("Microsoft.XMLHTTP");
-	}
-	if (http != null) {
-
-	  http.open("GET", url, true);
-	  http.send(null);
-	}
-    }
 
     function loadXMLDoc(url, id)
     {
@@ -79,12 +65,12 @@
 	<div id="content">
 	  <h1>My First Heading</h1>
 
-	  <button onClick=sendRequest('cmd/E/C/1/0/0')>RFSwitch 1 off</button>
-	  <button onClick=sendRequest('cmd/E/C/1/1/0')>RFSwitch 1 on</button>
-	  <button onClick=sendRequest('cmd/E/C/2/0/0')>RFSwitch 2 off</button>
-	  <button onClick=sendRequest('cmd/E/C/2/1/0')>RFSwitch 2 on</button>
-	  <button onClick=sendRequest('cmd/E/C/3/0/0')>RFSwitch 3 off</button>
-	  <button onClick=sendRequest('cmd/E/C/3/1/0')>RFSwitch 3 on</button>	
+	  <button onClick=loadXMLDoc('cmd/E/C/1/0/0','status')>RFSwitch 1 off</button>
+	  <button onClick=loadXMLDoc('cmd/E/C/1/1/0','status')>RFSwitch 1 on</button>
+	  <button onClick=loadXMLDoc('cmd/E/C/2/0/0','status')>RFSwitch 2 off</button>
+	  <button onClick=loadXMLDoc('cmd/E/C/2/1/0','status')>RFSwitch 2 on</button>
+	  <button onClick=loadXMLDoc('cmd/E/C/3/0/0','status')>RFSwitch 3 off</button>
+	  <button onClick=loadXMLDoc('cmd/E/C/3/1/0','status')>RFSwitch 3 on</button>	
 
 	    <p>
 	    <form name="demo" action="">
@@ -131,6 +117,8 @@
 	    </p>
 
 	</div>
+<div id='status'>
+</div>
 	<div id="footer">
 		CopySite name, 20XX
 	</div>

@@ -6,6 +6,8 @@
 #undef round
 
 
+// IR Receiver
+// *****************
 
 //  RF Switch
 //  ****************
@@ -13,6 +15,16 @@
 
 //Intantiate a new KaKuSwitch remote, also use pin 11 (same transmitter!)
 KaKuSwitch kaKuSwitch(12);
+
+#include <IRremote.h>
+
+int RECV_PIN = 3;
+
+IRrecv irrecv(RECV_PIN);
+
+decode_results results;
+
+
 
 //****************************
 
@@ -68,8 +80,9 @@ void setup()
 {
   // start serial port at 9600 bps:
   Serial.begin(9600);
-
-
+  
+  irrecv.enableIRIn(); // Start the receiver
+  
   //  RFLink  ************
   
   // Initialise the IO and ISR
@@ -141,26 +154,33 @@ void loop()
 {
     pollSerialPort();   
     pollRFLink();
+    if (irrecv.decode(&results)) {
+      Serial.print("IR;");
+      Serial.println(results.value, HEX);
+      irrecv.resume(); // Receive the next value
+    }
+
 }
 
 //  RF LINK ***************
 
 void pollRFLink()
 {
-
     uint8_t buf[VW_MAX_MESSAGE_LEN];
     uint8_t buflen = VW_MAX_MESSAGE_LEN;
 
     if (vw_get_message(buf, &buflen) && buflen > 4) // Non-blocking
     {
-        Serial.println(buflen, HEX);
 	int i;
 
-	Serial.print("Got: ");
+	Serial.print("RF;");
 	
 	    Serial.print(buf[0]);
-	    Serial.print(" ");
-	
+	    Serial.print(buf[1]);
+            Serial.print(buf[2]);
+            Serial.print(buf[3]);
+	    Serial.print(buf[4]);
+            Serial.print("\n");
             if(buf[0] == 'B')
             { // RGB gr B
 
@@ -191,10 +211,8 @@ void pollRFLink()
             {// error
                 return;
             } 
-
-	Serial.println("");
     
-  }
+    }
 }
 void rfsend(char *msg){
     //byte counter = 0;
@@ -203,7 +221,7 @@ void rfsend(char *msg){
 
     vw_send((uint8_t *)msg, strlen(msg));
     vw_wait_tx(); // Wait until the whole message is gone
-    Serial.println("Sent");
+    Serial.println("SW;Send");
 }
 
 void setSW(byte sw, byte state){  
@@ -215,9 +233,8 @@ void setSW(byte sw, byte state){
 void setLokalValue(char type, byte sw, byte state, byte byte1, byte byte2){  
   
    if(type == 'D'){
-     int bigInt = byte2 * 256 + byte1;
-          Serial.println("state");
-     Serial.println(state,HEX);
+       int bigInt = byte2 * 256 + byte1;
+          
        if(sw<'4') sw_state[sw - '0' - 1] = state - '0';
        else if(sw == '4')    debouncecount_lim = bigInt;
        else if(sw == '5')    sw1_up_lim = bigInt;   
@@ -234,9 +251,9 @@ void setRfSw(char ch, byte nr, byte state){
   if((state - '0') == 1) bool_state = true;
   
   kaKuSwitch.sendSignal(ch, nr - '0',bool_state);
+  Serial.println("RF;Send");
 
 }
-
 
 void pollSerialPort() {
   byte data; 
@@ -322,25 +339,25 @@ void readCommand(byte group, byte command, byte byte1, byte byte2) {
          char msg[] = {'Z', 'D', '0', '0', '0', '\0'};
          rfsend(msg);
       }else if(command == '1'){
-          Serial.print("debouncecount_lim: ");
+          Serial.print("LS;debouncecount_lim;");
             Serial.println(debouncecount_lim, HEX);
-          Serial.print("sw1_up_lim: ");
+          Serial.print("LS;sw1_up_lim;");
             Serial.println(sw1_up_lim, HEX);
-          Serial.print("sw2_up_lim: ");
+          Serial.print("LS;sw2_up_lim;");
             Serial.println(sw2_up_lim, HEX);
-          Serial.print("sw1_sw2_up_lim: ");
+          Serial.print("LS;sw1_sw2_up_lim;");
             Serial.println(sw1_sw2_up_lim, HEX); 
-          Serial.print("sw1_activ: ");
+          Serial.print("LS;sw1_activ;");
             Serial.println(sw_activ, HEX);
-          Serial.print("spannung: ");
+          Serial.print("LS;spannung;");
             Serial.println(spannung, HEX);
-          Serial.print("sw_state0: ");
+          Serial.print("LS;sw_state0: ");
             Serial.println(sw_state[0], HEX);
-          Serial.print("sw_state1: ");
+          Serial.print("LS;sw_state1;");
             Serial.println(sw_state[1], HEX);
-          Serial.print("sw_state2: ");
+          Serial.print("LS;sw_state2;");
             Serial.println(sw_state[2], HEX);
-          Serial.print("sw_state3: ");
+          Serial.print("LS;sw_state3;");
             Serial.println(sw_state[3], HEX);       
       }else if(command == 'Z'){
          char msg[] = {'Z', 'Z', '0', '0', '0', '\0'};
@@ -486,7 +503,7 @@ void command_data_settings(boolean mode, boolean increment, byte rwmode){
  if(rwmode <= 3){
    data = data + rwmode;
  }else{
-   Serial.print("bad rwmode");
+   Serial.print("VFD;bad_rwmode");
  }
  
  write_data(data); 
@@ -511,7 +528,7 @@ void command_set_address(byte address){
   if(address < 0x30){
     data = data + address;
   }else{
-    Serial.print("address error");
+    Serial.print("VFD;address_error");
   }
   
   write_data(data); 
@@ -535,7 +552,7 @@ void command_displ_ctrl(boolean on, byte pulse_width){
   if(pulse_width < 8){
     data = data + pulse_width;
   }else{
-    Serial.print("bad pulse with");
+    Serial.print("VFD;bad_pulse_with");
   }
   write_data(data);
 }

@@ -7,19 +7,6 @@
  
   <script type="text/javascript">
 
-      function sendRequest(url){
-	  var http = null;
-	  if (window.XMLHttpRequest) {
-	    http = new XMLHttpRequest();
-	  } else if (window.ActiveXObject) {
-	    http = new ActiveXObject("Microsoft.XMLHTTP");
-	  }
-	  if (http != null) {
-
-	    http.open("GET", url, true);
-	    http.send(null);
-	  }
-      }
       function setalarm()
       {
 	  repeatValue = 0;

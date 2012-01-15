@@ -7,23 +7,6 @@
  
 <script type="text/javascript"><!--
 
-    function sendRequest(url){
-	var http = null;
-	if (window.XMLHttpRequest) {
-	  http = new XMLHttpRequest();
-	} else if (window.ActiveXObject) {
-	  http = new ActiveXObject("Microsoft.XMLHTTP");
-	}
-	if (http != null) {
-
-	  http.open("GET", url, true);
-	  http.send(null);
-	}
-    }
-
-    function changeText(text){
-	    document.getElementById('title').innerHTML = text;
-    }
     function getMPDstats()
     {
  	loadXMLDoc('mpd/currentsong/0/0/0/0', 'title');
@@ -52,6 +35,21 @@
       xmlhttp.open("GET",url,true);
       xmlhttp.send();
 
+    }
+
+    function mpdCommand(cmd){
+	if(cmd=='play'){
+	    loadXMLDoc('mpd/play/1/0/0/0','status');
+	}else if(cmd=='stop'){
+	    loadXMLDoc('mpd/stop/1/0/0/0','status');
+	}else if(cmd=='next'){
+	    loadXMLDoc('mpd/next/1/0/0/0','status');
+	}else if(cmd=='pause'){
+	    loadXMLDoc('mpd/pause/1/0/0/0','status');
+	}else if(cmd=='previous'){
+	    loadXMLDoc('mpd/previous/1/0/0/0','status');
+	}
+	getMPDstats();
     }
 
 </script>
@@ -83,13 +81,20 @@
 <p>		<div id = "time">
 			nothing to see
 		</div>
-</p>
-	  <button onClick=sendRequest('cmd/D/1/0/0/0')>Switch 1 off</button>
-	  <button onClick=sendRequest('cmd/D/1/1/0/0')>Switch 1 on</button>
-	  <button onClick=sendRequest('cmd/D/2/0/0/0')>Switch 2 off</button>
-	  <button onClick=sendRequest('cmd/D/2/1/0/0')>Switch 2 on</button>	
+</p>	
+	  <button onClick=mpdCommand('play')>Play</button>
+	  <button onClick=mpdCommand('pause')>Pause</button>
+	  <button onClick=mpdCommand('next')>Next</button>
+	  <button onClick=mpdCommand('previous')>Prevoius</button>
+	  <button onClick=mpdCommand('stop')>Stop</button><br>
+	  <button onClick=loadXMLDoc('cmd/D/1/0/0/0','status')>Switch 1 on</button>
+	  <button onClick=loadXMLDoc('cmd/D/1/1/0/0','status')>Switch 1 off</button>
+	  <button onClick=loadXMLDoc('cmd/D/2/0/0/0','status')>Switch 2 on</button>
+	  <button onClick=loadXMLDoc('cmd/D/2/1/0/0','status')>Switch 2 off</button>	
 	
 	</div>
+<div id='status'>
+</div>
 	<div id="footer">
 		CopySite name, 20XX
 	</div>
