@@ -5,26 +5,13 @@
 #undef float
 #undef round
 
-
-// IR Receiver
-// *****************
-
 //  RF Switch
 //  ****************
 #include <RemoteSwitch.h>
+#include <RemoteReceiver.h>
 
 //Intantiate a new KaKuSwitch remote, also use pin 11 (same transmitter!)
-KaKuSwitch kaKuSwitch(12);
-
-#include <IRremote.h>
-
-int RECV_PIN = 3;
-
-IRrecv irrecv(RECV_PIN);
-
-decode_results results;
-
-
+KaKuSwitch kaKuSwitch(3);
 
 //****************************
 
@@ -33,7 +20,7 @@ decode_results results;
 //  * SDI - to digital pin 11 (MOSI pin)
 //  * CLK - to digital pin 13 (SCK pin)
 // inslude the SPI library:
-//#include <SPI.h>
+#include <SPI.h>
 
 #define channelCount 6
 
@@ -52,10 +39,10 @@ CHANNEL group1[channelCount];
 // VFD
 //***********
 int dout =  7;    // LED connected to digital pin 13
-int stb =  6;
-int clk =  5;
+int stb =  5;
+int clk =  6;
 int din =  4;
-int led =  9;
+int led =  13;
 byte digits = 14; 
 byte pulse_width = B00000011;  //0-7 Brightness
 //******************
@@ -81,19 +68,20 @@ void setup()
   // start serial port at 9600 bps:
   Serial.begin(9600);
   
-  irrecv.enableIRIn(); // Start the receiver
+  RemoteReceiver::init(0, 1, showCode);
   
   //  RFLink  ************
   
   // Initialise the IO and ISR
+  vw_set_tx_pin(3);
   vw_set_ptt_inverted(true); // Required for DR3100
   vw_setup(1000);	 // Bits per sec
   vw_rx_start();       // Start the receiver PLL running
   
   
   //   RGB *********
-  // initialize SPI:
-  //SPI.begin();  
+  //    initialize SPI:
+  SPI.begin();  
   
   for (int i =0; i<channelCount; i++)
   {
@@ -154,12 +142,6 @@ void loop()
 {
     pollSerialPort();   
     pollRFLink();
-    if (irrecv.decode(&results)) {
-      Serial.print("IR;");
-      Serial.println(results.value, HEX);
-      irrecv.resume(); // Receive the next value
-    }
-
 }
 
 //  RF LINK ***************
@@ -221,7 +203,7 @@ void rfsend(char *msg){
 
     vw_send((uint8_t *)msg, strlen(msg));
     vw_wait_tx(); // Wait until the whole message is gone
-    Serial.println("SW;Send");
+    Serial.println("VW;Send");
 }
 
 void setSW(byte sw, byte state){  
@@ -252,6 +234,18 @@ void setRfSw(char ch, byte nr, byte state){
   
   kaKuSwitch.sendSignal(ch, nr - '0',bool_state);
   Serial.println("RF;Send");
+
+}
+
+//Callback function is called only when a valid code is received.
+void showCode(unsigned long receivedCode, unsigned int period) {
+  //Note: interrupts are disabled. You can re-enable them if needed.
+  
+  //Print the received code.
+  Serial.print("RFgot;");
+  Serial.print(receivedCode);
+  Serial.print(";duration;");
+  Serial.println(period);
 
 }
 

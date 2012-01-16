@@ -7,10 +7,12 @@
  
 <script type="text/javascript"><!--
 
-    function getMPDstats()
+    function getstats()
     {
  	loadXMLDoc('mpd/currentsong/0/0/0/0', 'title');
 	loadXMLDoc('mpd/time/0/0/0/0', 'time');
+	loadXMLDoc('sys/cpuLoad/0/0/0/0', 'cpuLoad');
+	loadXMLDoc('sys/meminfo/0/0/0/0', 'meminfo');
     }
 
     function loadXMLDoc(url, id)
@@ -49,17 +51,21 @@
 	}else if(cmd=='previous'){
 	    loadXMLDoc('mpd/previous/1/0/0/0','status');
 	}
-	getMPDstats();
+	getstats();
     }
 
 </script>
 
 </head>
-<body onload=getMPDstats()>
+<body onload=getstats()>
 
 <div id="container">
 	<div id="header">
 	      <h1>Control Centauris</h1>
+	      <div align="right">
+		  <div id='cpuLoad' align="left">CPU</div>
+		  <div id='meminfo' align="left">RAM</div>
+	      </div>
 	</div>
 	<div id="navigation">
 		<ul>

@@ -29,6 +29,7 @@ class MyArduino():
 	for device in locations:
 	  try:
 	    self.arduino = serial.Serial(device, 9600)
+	    self.arduino.timeout = 0 
 	    print "Connected on",device
 	    break
 	  except:
@@ -166,8 +167,9 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	self.mpdclient = self.server.mympdClient
 	self.lock = self.server.lock
 	self.timer = self.server.timer
-	
+
 	data = self.request.recv(100)
+	self.cpuLoad = [0,0,0,0]
 	
 	re1='(GET)'
 	re2='.*?'
@@ -330,7 +332,19 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		  
 	    self.request.send(s)
+	
+	elif command[1] == "sys":
+	    if command[2] == "cpuLoad":
+		self.cpuLoad = deltaTime(1)
+	    	    
+		cpuPct = 100 - (self.cpuLoad[len(self.cpuLoad) - 1] * 100.00 / sum(self.cpuLoad))
+		s = "CPU Load: " +  str('%.2f' %cpuPct) +"%"
+	    elif command[2] == "meminfo":
+		meminfo = getMeminfo()
+		s = 'Free Memory: ' + meminfo[1] + ' / ' + meminfo[0] 
 	    
+	    self.request.send(s)
+	
 	elif os.path.exists("/home/aex/sketchbook/htdocs/" + command[1]):
 	      print "+ Attempting to serve "+ self.unixpath1 +"\n"
 	      file = open("/home/aex/sketchbook/htdocs/"  + command[1], "r")
@@ -378,7 +392,6 @@ def main():
       mympdClient = MyMPDClient()
       lock=thread.allocate_lock()
       timer = MyTimer()
-      
       myServer = TCPServer(("", 8001), MyRequestHandler)
       myServer_thread = threading.Thread(target=myServer.serve_forever)
       myServer_thread.setDaemon(True)
@@ -390,14 +403,69 @@ def main():
       
       weekdayArray = ['Mo','Di','Mi','Do','Fr','Sa','So']
       myAlarmTime = []
-      
-      counterAlarm=0
+      counterAlarm = 0
+
+      cnt = 0
+      while cnt<41:
+	  arduino.write('C' + chr(cnt) + chr(0) +'00')  
+	  cnt = cnt + 1
       
       while True:
+	
+	    time.sleep(0.1)
+
+	    mpd_currentSong = mympdClient.getCurrentsong()
+	    s = mpd_currentSong['title']
+	    myEncodedMessage = encodeVFDMessage(s)
 	    
-	    print arduino.read()
-	    
+	    for addr, bits in myEncodedMessage.iteritems():
+		arduino.write('C' + chr(addr) + chr(bits) +'00')  
+
+	    arduinoMessage = arduino.read().split(';')
+
+	    if(arduinoMessage[0] == "RFgot"):
+		if(arduinoMessage[1] == "118772"):
+		    print 'got RF cmd mpd pause'
+		    mympdClient.pause()
+		elif(arduinoMessage[1] == "118770"):
+		    print 'got RF mpd play'
+		    mympdClient.play()
+		elif(arduinoMessage[1] == "123144"):
+		    print 'got RF mpd stop'
+		    mympdClient.stop()
+		elif(arduinoMessage[1] == "120230"):
+		    print 'got RF mpd previous'
+		    mympdClient.previous()
+		elif(arduinoMessage[1] == "120228"):
+		    print 'got RF mpd next'
+		    mympdClient._next()
+		elif(arduinoMessage[1] == "122498"):
+		    print 'got RF sw on'
+		    time.sleep(0.1)
+		    arduino.write('D1000')
+		    time.sleep(0.1)
+		elif(arduinoMessage[1] == "122496"):
+		    print 'got RF sw off'
+		    time.sleep(0.1)
+		    arduino.write('D1100')
+		    time.sleep(0.1)
+		elif(arduinoMessage[1] == "123956"):
+		    print 'got RF rfsw on'
+		    time.sleep(0.1)
+		    arduino.write('EC110')
+		    arduino.write('EC310')
+		    time.sleep(0.1)
+		elif(arduinoMessage[1] == "123954"):
+		    print 'got RF rfsw off'
+		    time.sleep(0.1)
+		    arduino.write('EC100')
+		    time.sleep(0.01)
+		    arduino.write('EC300')
+		    time.sleep(0.1)
+		    
 	    if(counterAlarm==45):counterAlarm=0
+	    
+	    counterAlarm += 0.1
 	    
 	    if(counterAlarm==0):
 		my_timerList = timer.getTimer()
@@ -430,9 +498,45 @@ def main():
 			  ma_AlarmThread.start()
 			  print 'ALARM'
 
-	    time.sleep(1)
-	
       myServer.shutdown()
+      
+##  Channell C  ##
+
+#E10	118122
+#E11	118124
+#E20	122496
+#E21	122498
+#E30	119580
+#E31	119582
+#E40	123954
+#E41	123956
+
+#E50	118608
+#E51	118610
+#E60	122982
+#E61	122984
+#E70	120066
+#E71	120068
+#E80	124440
+#E81	124442
+
+#E90	118284
+#E91	118286
+#EA0	122658
+#EA1	122660
+#EB0	119742
+#EB1	119740
+#EC0	124116
+#EC1	124118
+
+#ED0	118770
+#ED1	118772
+#EE0	123144
+#EE1	123146
+#EF0	120228
+#EF1	120230
+#E00	124602
+#E01	124604
 
 def mpdConnect(client, con_id):
     """
@@ -444,6 +548,106 @@ def mpdConnect(client, con_id):
         return False
     return True
 
+def encodeVFDMessage(message):
+    message = message.upper()
+    letters14v1_1 = {}    
+    letters14v1_2 = {}    
+    letters14v1_1['A'] = 0b11100011
+    letters14v1_2['A'] = 0b00001001    
+    letters14v1_1['B'] = 0b01001011
+    letters14v1_2['B'] = 0b00010001
+    letters14v1_1['C'] = 0b00100001
+    letters14v1_2['C'] = 0b00011000
+    letters14v1_1['D'] = 0b00001011
+    letters14v1_2['D'] = 0b00010001
+    letters14v1_1['E'] = 0b10100001
+    letters14v1_2['E'] = 0b00011000
+    letters14v1_1['F'] = 0b10100001
+    letters14v1_2['F'] = 0b00001000
+    letters14v1_1['G'] = 0b01100001
+    letters14v1_2['G'] = 0b00011001
+    letters14v1_1['H'] = 0b11100010
+    letters14v1_2['H'] = 0b00001001
+    letters14v1_1['I'] = 0b00001001
+    letters14v1_2['I'] = 0b00010000
+    letters14v1_1['J'] = 0b00000010
+    letters14v1_2['J'] = 0b00011001
+    letters14v1_1['K'] = 0b10110000
+    letters14v1_2['K'] = 0b00001010
+    letters14v1_1['L'] = 0b00100000
+    letters14v1_2['L'] = 0b00011000
+    letters14v1_1['M'] = 0b00110110
+    letters14v1_2['M'] = 0b00001001    
+    letters14v1_1['N'] = 0b00100110
+    letters14v1_2['N'] = 0b00001011
+    letters14v1_1['O'] = 0b00100011
+    letters14v1_2['O'] = 0b00011001
+    letters14v1_1['P'] = 0b11100011
+    letters14v1_2['P'] = 0b00001000
+    letters14v1_1['Q'] = 0b00100011
+    letters14v1_2['Q'] = 0b00011011
+    letters14v1_1['R'] = 0b11100011
+    letters14v1_2['R'] = 0b00001010
+    letters14v1_1['S'] = 0b11100001
+    letters14v1_2['S'] = 0b00010001
+    letters14v1_1['T'] = 0b00001001
+    letters14v1_2['T'] = 0b00000000
+    letters14v1_1['U'] = 0b00100010
+    letters14v1_2['U'] = 0b00011001
+    letters14v1_1['V'] = 0b00110000
+    letters14v1_2['V'] = 0b00001100
+    letters14v1_1['W'] = 0b00100010
+    letters14v1_2['W'] = 0b00001111
+    letters14v1_1['X'] = 0b00010100
+    letters14v1_2['X'] = 0b00000110
+    letters14v1_1['Y'] = 0b00010100
+    letters14v1_2['Y'] = 0b00000100
+    letters14v1_1['Z'] = 0b00010001
+    letters14v1_2['Z'] = 0b00010100
+    letters14v1_1['0'] = 0b00110011
+    letters14v1_2['0'] = 0b00011101
+    letters14v1_1['1'] = 0b00010010
+    letters14v1_2['1'] = 0b00000001
+    letters14v1_1['2'] = 0b11000011
+    letters14v1_2['2'] = 0b00011000
+    letters14v1_1['3'] = 0b01000011
+    letters14v1_2['3'] = 0b00010001
+    letters14v1_1['4'] = 0b11100010
+    letters14v1_2['4'] = 0b00000001
+    letters14v1_1['5'] = 0b11100001
+    letters14v1_2['5'] = 0b00010001
+    letters14v1_1['6'] = 0b11100001
+    letters14v1_2['6'] = 0b01011001
+    letters14v1_1['7'] = 0b00010001
+    letters14v1_2['7'] = 0b00000100
+    letters14v1_1['8'] = 0b11100011
+    letters14v1_2['8'] = 0b00011001
+    letters14v1_1['9'] = 0b11100011
+    letters14v1_2['9'] = 0b00010001
+    letters14v1_1[':'] = 0b00001000
+    letters14v1_2[':'] = 0b00000000
+    letters14v1_1['-'] = 0b11000000
+    letters14v1_2['-'] = 0b00000000
+    letters14v1_1['/'] = 0b00010000
+    letters14v1_2['/'] = 0b00000100
+    letters14v1_1[' '] = 0b00000000
+    letters14v1_2[' '] = 0b00000000    
+    addr = [12,13,15,16,18,19,21,22,24,25,27,28,30,31,33,34]
+    returnDict = {}
+    
+    if len(message)>8: lim=8
+    else: lim=len(message)
+    cnt = 0 
+    addrcnt=0
+    
+    while cnt < lim:
+	returnDict[addr[addrcnt]] = letters14v1_1[message[cnt]]
+	returnDict[addr[addrcnt+1]] = letters14v1_2[message[cnt]]
+	cnt = cnt+1
+	addrcnt = addrcnt+2
+    
+    return returnDict
+
 def mpdAuth(client, secret):
     """
     Authenticate
@@ -453,5 +657,32 @@ def mpdAuth(client, secret):
     except CommandError:
         return False
     return True
+    
+def getTimeList():
+    statFile = file("/proc/stat", "r")
+    timeList = statFile.readline().split(" ")[2:6]
+    statFile.close()
+    for i in range(len(timeList))  :
+        timeList[i] = int(timeList[i])
+    return timeList
+def getMeminfo():
+    statFile = file("/proc/meminfo", "r")
+    memTotal = statFile.readline().split(":")
+    memFree = statFile.readline().split(":")
+    statFile.close()
+    mymemTotal = memTotal[1].lstrip().rstrip().rstrip("kB")
+    mymemFree = memFree[1].lstrip().rstrip().rstrip("kB")
+    mymemFree = str(int(mymemFree) /1024) + ' Mbyte'
+    mymemTotal = str(int(mymemTotal) /1024) + ' Mbyte'
+    return [mymemTotal, mymemFree] 
+    
+def deltaTime(interval)  :
+    x = getTimeList()
+    time.sleep(interval)
+    y = getTimeList()
+    for i in range(len(x))  :
+        y[i] -= x[i]
+    return y
+    
 if __name__ == "__main__":
     main()
