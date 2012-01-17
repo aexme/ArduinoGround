@@ -1,4 +1,3 @@
-#include <VirtualWire.h>
 #undef int
 #undef abs
 #undef double
@@ -45,17 +44,21 @@ int din =  4;
 int led =  13;
 byte digits = 14; 
 byte pulse_width = B00000011;  //0-7 Brightness
+
+int key1pin = 4;   
+int key2pin = 5;  
 //******************
 
 // RF Link
 //*************
+#include <VirtualWire.h>
 
 boolean sw_state[] = {false, false, false, false};
 
 int akkuspannungpin = 1;   
 int spannung = 1000;       
 int debouncecount = 0;     
-int debouncecount_lim = 6000;  // command 4
+int debouncecount_lim = 9000;  // command 4
 int sw1_up_lim = 580;      // command 5
 int sw2_up_lim = 700;       // command 6
 int sw1_sw2_up_lim = 0;    // command 7
@@ -68,16 +71,18 @@ void setup()
   // start serial port at 9600 bps:
   Serial.begin(9600);
   
+  // VFD
+  initVFD();
+  
+  // RFSwitch  
   RemoteReceiver::init(0, 1, showCode);
   
-  //  RFLink  ************
-  
+  //  RFLink  ***********
   // Initialise the IO and ISR
   vw_set_tx_pin(3);
   vw_set_ptt_inverted(true); // Required for DR3100
   vw_setup(1000);	 // Bits per sec
   vw_rx_start();       // Start the receiver PLL running
-  
   
   //   RGB *********
   //    initialize SPI:
@@ -90,126 +95,20 @@ void setup()
       group1[i].b = 0;
   }
   setLight();
-  // ****************
   
-  // VFD
-  //****************
-  pinMode(dout, OUTPUT);     
-  pinMode(din, INPUT);
-  digitalWrite(dout, LOW); 
-  
-  pinMode(stb, OUTPUT);    
-  digitalWrite(stb, HIGH); 
-  
-  pinMode(clk, OUTPUT);     
-  digitalWrite(clk, LOW);
-  
-  pinMode(led, OUTPUT);
-  digitalWrite(led, LOW);
-
-  digitalWrite(stb, HIGH);
-  delayMicroseconds(2);                  // wait for a second
-
-  command_disp_mode(digits);
-  digitalWrite(stb, HIGH); 
-  delayMicroseconds(2);                  // wait for a second
-  digitalWrite(stb, LOW);
-  command_displ_ctrl(1, pulse_width);
-  delayMicroseconds(2);                  // wait for a second
-  digitalWrite(stb, HIGH); 
-  delayMicroseconds(2);                  // wait for a second
-  
-  digitalWrite(stb, LOW);
-  delayMicroseconds(2);                  // wait for a second
-  command_set_address(0);
-  delayMicroseconds(2); 
-  
-  //clear display ram
-  for(int i=0; i < 46; i++){
-    write_data(0x0);
-    delayMicroseconds(1); 
-  }
-  
-  digitalWrite(stb, HIGH); 
-  delayMicroseconds(2);       
-  
-  //***************************
-  
-   
 }
 
 void loop()
 {
     pollSerialPort();   
     pollRFLink();
-}
-
-//  RF LINK ***************
-
-void pollRFLink()
-{
-    uint8_t buf[VW_MAX_MESSAGE_LEN];
-    uint8_t buflen = VW_MAX_MESSAGE_LEN;
-
-    if (vw_get_message(buf, &buflen) && buflen > 4) // Non-blocking
-    {
-	int i;
-
-	Serial.print("RF;");
-	
-	    Serial.print(buf[0]);
-	    Serial.print(buf[1]);
-            Serial.print(buf[2]);
-            Serial.print(buf[3]);
-	    Serial.print(buf[4]);
-            Serial.print("\n");
-            if(buf[0] == 'B')
-            { // RGB gr B
-
-                byte ch = buf[1];      
-                byte r = buf[2];      
-                byte g = buf[3];      
-                byte b = buf[4];      
-                //setColor(r, g, b, ch, 'A');
-                return;        
-      
-            }else if(buf[0] == 'D') 
-            {// Switch
-                byte sw = buf[1];      
-                byte state = buf[2];  
-                byte g = buf[3];      
-                byte b = buf[4];          
-                setLokalValue('D', sw, state, g, b);
-                return;        
-            }else if(buf[0] == 'Z')
-            {// Command
-                byte gr = buf[1];      
-                byte command = buf[2];      
-                byte byte1 = buf[3];      
-                byte byte2 = buf[4];  
-                //setLokalValue('Z', sw, state);
-                return;        
-            }else
-            {// error
-                return;
-            } 
     
+    if(debouncecount > debouncecount_lim){ 
+      debouncecount = 0;
+      getKeys();
     }
-}
-void rfsend(char *msg){
-    //byte counter = 0;
-    uint8_t buf[VW_MAX_MESSAGE_LEN];
-    uint8_t buflen = VW_MAX_MESSAGE_LEN;
+    debouncecount++;
 
-    vw_send((uint8_t *)msg, strlen(msg));
-    vw_wait_tx(); // Wait until the whole message is gone
-    Serial.println("VW;Send");
-}
-
-void setSW(byte sw, byte state){  
-  
-  char msg[] = {'D', sw, state, '0', '0', '\0'};
-  rfsend(msg);  
 }
 
 void setLokalValue(char type, byte sw, byte state, byte byte1, byte byte2){  
@@ -224,29 +123,6 @@ void setLokalValue(char type, byte sw, byte state, byte byte1, byte byte2){
        else if(sw == '7')    sw1_sw2_up_lim = bigInt;  
        else if(sw=='8') sw_activ = ( (byte1 - '0') == true);
    }
-}
-
-//  RFSWITCH  *****************
-
-void setRfSw(char ch, byte nr, byte state){
-  boolean bool_state = false;
-  if((state - '0') == 1) bool_state = true;
-  
-  kaKuSwitch.sendSignal(ch, nr - '0',bool_state);
-  Serial.println("RF;Send");
-
-}
-
-//Callback function is called only when a valid code is received.
-void showCode(unsigned long receivedCode, unsigned int period) {
-  //Note: interrupts are disabled. You can re-enable them if needed.
-  
-  //Print the received code.
-  Serial.print("RFgot;");
-  Serial.print(receivedCode);
-  Serial.print(";duration;");
-  Serial.println(period);
-
 }
 
 void pollSerialPort() {
@@ -366,7 +242,106 @@ void readCommand(byte group, byte command, byte byte1, byte byte2) {
 
 
 
+//  ***********************
+//  RF LINK ***************
+//  ***********************
+
+void pollRFLink()
+{
+    uint8_t buf[VW_MAX_MESSAGE_LEN];
+    uint8_t buflen = VW_MAX_MESSAGE_LEN;
+
+    if (vw_get_message(buf, &buflen) && buflen > 4) // Non-blocking
+    {
+	int i;
+
+	Serial.print("RF;");
+	
+	    Serial.print(buf[0]);
+	    Serial.print(buf[1]);
+            Serial.print(buf[2]);
+            Serial.print(buf[3]);
+	    Serial.print(buf[4]);
+            Serial.print("\n");
+            if(buf[0] == 'B')
+            { // RGB gr B
+
+                byte ch = buf[1];      
+                byte r = buf[2];      
+                byte g = buf[3];      
+                byte b = buf[4];      
+                //setColor(r, g, b, ch, 'A');
+                return;        
+      
+            }else if(buf[0] == 'D') 
+            {// Switch
+                byte sw = buf[1];      
+                byte state = buf[2];  
+                byte g = buf[3];      
+                byte b = buf[4];          
+                setLokalValue('D', sw, state, g, b);
+                return;        
+            }else if(buf[0] == 'Z')
+            {// Command
+                byte gr = buf[1];      
+                byte command = buf[2];      
+                byte byte1 = buf[3];      
+                byte byte2 = buf[4];  
+                //setLokalValue('Z', sw, state);
+                return;        
+            }else
+            {// error
+                return;
+            } 
+    
+    }
+}
+void rfsend(char *msg){
+    //byte counter = 0;
+    uint8_t buf[VW_MAX_MESSAGE_LEN];
+    uint8_t buflen = VW_MAX_MESSAGE_LEN;
+
+    vw_send((uint8_t *)msg, strlen(msg));
+    vw_wait_tx(); // Wait until the whole message is gone
+    Serial.println("VW;Send");
+}
+
+void setSW(byte sw, byte state){  
+  
+  char msg[] = {'D', sw, state, '0', '0', '\0'};
+  rfsend(msg);  
+}
+
+
+
+//  ***************************
+//  RFSWITCH  *****************
+//  ***************************
+
+void setRfSw(char ch, byte nr, byte state){
+  boolean bool_state = false;
+  if((state - '0') == 1) bool_state = true;
+  
+  kaKuSwitch.sendSignal(ch, nr - '0',bool_state);
+  Serial.println("RF;Send");
+
+}
+
+//Callback function is called only when a valid code is received.
+void showCode(unsigned long receivedCode, unsigned int period) {
+  //Note: interrupts are disabled. You can re-enable them if needed.
+  
+  //Print the received code.
+  Serial.print("RF;");
+  Serial.print(receivedCode);
+  Serial.println(";");
+
+}
+
+// ********************
 // RGB ****************
+// ********************
+
 void setColor(byte r,byte g,byte b,byte ch, char group){
   
   if(group == 'A'){
@@ -403,11 +378,87 @@ int digitalPotWrite(byte g) {
   //SPI.transfer(g);
 }
 
-//*******************
 
 
+// *******************
 // VFD
-//*******************
+// *******************
+
+
+void initVFD(){
+
+  pinMode(dout, OUTPUT);     
+  pinMode(din, INPUT);
+  digitalWrite(dout, LOW); 
+  
+  pinMode(stb, OUTPUT);    
+  digitalWrite(stb, HIGH); 
+  
+  pinMode(clk, OUTPUT);     
+  digitalWrite(clk, LOW);
+  
+  pinMode(led, OUTPUT);
+  digitalWrite(led, LOW);
+
+  digitalWrite(stb, HIGH);
+  delayMicroseconds(2);                  // wait for a second
+
+  command_disp_mode(digits);
+  digitalWrite(stb, HIGH); 
+  delayMicroseconds(2);                  // wait for a second
+  digitalWrite(stb, LOW);
+  command_displ_ctrl(1, pulse_width);
+  delayMicroseconds(2);                  // wait for a second
+  digitalWrite(stb, HIGH); 
+  delayMicroseconds(2);                  // wait for a second
+  
+  digitalWrite(stb, LOW);
+  delayMicroseconds(2);                  // wait for a second
+  command_set_address(0);
+  delayMicroseconds(2); 
+  
+  //clear display ram
+  for(int i=0; i < 46; i++){
+    write_data(0);
+    delayMicroseconds(1); 
+  }  
+  digitalWrite(stb, HIGH); 
+  delayMicroseconds(2); 
+
+}
+
+void getKeys(){
+  
+    int spannung1=0;
+    int spannung2=0;
+    spannung1 = analogRead(key1pin);
+    spannung2 = analogRead(key2pin);
+
+    if(spannung1 < 250 && spannung1 > 220){
+          Serial.println("VFDkey;TA;");
+    }
+    if(spannung1 < 350 && spannung1 > 320){
+          Serial.println("VFDkey;PTY;");
+    }
+    if(spannung1 < 170 && spannung1 > 130){
+          Serial.println("VFDkey;AF;");
+    }    
+    if(spannung1 < 110 && spannung1 > 70){
+          Serial.println("VFDkey;Power;");
+    }
+    if(spannung1 < 65 && spannung1 > 20){
+          Serial.println("VFDkey;DSP;");
+    }
+    if(spannung1 < 460 && spannung1 > 420){
+          Serial.println("VFDkey;MODE;");
+    }
+    if(spannung1 < 900 && spannung1 > 860){
+          Serial.println("VFDkey;EQ;");
+    }
+    if(spannung1 < 820 && spannung1 > 780){
+          Serial.println("VFDkey;SCN;");
+    }   
+}
 
 void setVFD(byte addr, byte data){
 
@@ -497,13 +548,11 @@ void command_data_settings(boolean mode, boolean increment, byte rwmode){
  if(rwmode <= 3){
    data = data + rwmode;
  }else{
-   Serial.print("VFD;bad_rwmode");
+   Serial.println("VFD;bad_rwmode");
  }
  
  write_data(data); 
 }
-
-
 
 void command_led(byte led){
   write_data(led);
@@ -511,7 +560,6 @@ void command_led(byte led){
 }
 
 void command_switch(){
-  
   
 }
 
@@ -522,7 +570,7 @@ void command_set_address(byte address){
   if(address < 0x30){
     data = data + address;
   }else{
-    Serial.print("VFD;address_error");
+    Serial.println("VFD;address_error");
   }
   
   write_data(data); 
@@ -546,7 +594,7 @@ void command_displ_ctrl(boolean on, byte pulse_width){
   if(pulse_width < 8){
     data = data + pulse_width;
   }else{
-    Serial.print("VFD;bad_pulse_with");
+    Serial.println("VFD;bad_pulse_with");
   }
   write_data(data);
 }

@@ -25,7 +25,8 @@ class MyArduino():
     def __init__(self):
 	locations=['/dev/ttyUSB0','/dev/ttyUSB1','/dev/ttyUSB2','/dev/ttyUSB3',
 	    '/dev/ttyS0','/dev/ttyS1','/dev/ttyS2','/dev/ttyS3']
-	    
+	self.lock=thread.allocate_lock()
+
 	for device in locations:
 	  try:
 	    self.arduino = serial.Serial(device, 9600)
@@ -36,10 +37,18 @@ class MyArduino():
 	    print "Failed to connect on",device
 	
     def write(self, text):
+      self.lock.acquire() 
       self.arduino.write(text)
-    
+      self.lock.release()
+      
     def read(self):
-      return self.arduino.readline()
+      data = self.arduino.read(9999)
+
+      if len(data) > 7:
+        return data
+      else: return ''
+
+      return 
 
 class MyTimer():
     def __init__(self):
@@ -198,11 +207,8 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    if len(command) > 6:
 
 		try:
-		    
-		    self.lock.acquire() 
 		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
 		    self.request.send("cmd sent")
-		    self.lock.release()
 		    time.sleep(0.01)		    
 		except:
 		    time.sleep(0)
@@ -410,51 +416,100 @@ def main():
 	  arduino.write('C' + chr(cnt) + chr(0) +'00')  
 	  cnt = cnt + 1
       
+      vfdMessagecnt = 0
+      vfdTimer = 0
+      loadingsymbol = 32
       while True:
 	
 	    time.sleep(0.1)
-
-	    mpd_currentSong = mympdClient.getCurrentsong()
-	    s = mpd_currentSong['title']
-	    myEncodedMessage = encodeVFDMessage(s)
-	    
-	    for addr, bits in myEncodedMessage.iteritems():
-		arduino.write('C' + chr(addr) + chr(bits) +'00')  
-
+	    if vfdTimer>3: vfdTimer=0  
+	    if vfdTimer==0:
+		mpd_currentSong = mympdClient.getCurrentsong()
+		s = "        "
+		noartistname=0		       
+		try:	    
+		    s += mpd_currentSong['artist']
+		    noartistname=1
+		except:
+		    pass
+		try:
+		    s += mpd_currentSong['name']		      
+		    noartistname=1
+		except:
+		    pass
+		if noartistname == 0: s+='NO Artist'
+		try:	    
+		    s += ' - ' + mpd_currentSong['title']
+		except:
+		    s+=' NO TITLE'
+		 
+		if vfdMessagecnt > len(s)-8:
+		      s += ' '
+		if vfdMessagecnt > len(s)-3:
+		      vfdMessagecnt = 0
+		
+		writeVfdMessage(arduino, s[vfdMessagecnt:vfdMessagecnt+8])
+		
+		vfdMessagecnt +=1    
+		
+		arduino.write('C' + chr(10) + chr(4) +'00') # classic stereo sign
+		arduino.write('C' + chr(39) + chr(1) +'00') # circle sign
+		arduino.write('C' + chr(9) + chr(loadingsymbol+1) +'00') # circle sign
+		if loadingsymbol < 128:
+		    loadingsymbol  *=2 
+		else: loadingsymbol = 32
+		
+	    vfdTimer+=1
 	    arduinoMessage = arduino.read().split(';')
 
-	    if(arduinoMessage[0] == "RFgot"):
+	    if(arduinoMessage[0] == "RF"):
 		if(arduinoMessage[1] == "118772"):
 		    print 'got RF cmd mpd pause'
+		    writeVfdMessage(arduino, ' PAUSE  ')		    		   
 		    mympdClient.pause()
+		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "118770"):
 		    print 'got RF mpd play'
+		    writeVfdMessage(arduino, '  PLAY  ')		    
 		    mympdClient.play()
+		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "123144"):
 		    print 'got RF mpd stop'
+		    writeVfdMessage(arduino, '  STOP  ')		    
 		    mympdClient.stop()
+		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "120230"):
 		    print 'got RF mpd previous'
+		    writeVfdMessage(arduino, '  PREV  ')		    
 		    mympdClient.previous()
+		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "120228"):
 		    print 'got RF mpd next'
 		    mympdClient._next()
+		    writeVfdMessage(arduino, '  NEXT  ')		    
+		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "122498"):
 		    print 'got RF sw on'
 		    time.sleep(0.1)
 		    arduino.write('D1000')
-		    time.sleep(0.1)
+		    time.sleep(0.1)		  
+		    writeVfdMessage(arduino, ' SW ON  ')
+		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "122496"):
 		    print 'got RF sw off'
 		    time.sleep(0.1)
-		    arduino.write('D1100')
+		    arduino.write('D1100')		    
 		    time.sleep(0.1)
+		    writeVfdMessage(arduino, ' SW OFF ')
+		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "123956"):
 		    print 'got RF rfsw on'
 		    time.sleep(0.1)
 		    arduino.write('EC110')
 		    arduino.write('EC310')
 		    time.sleep(0.1)
+		    writeVfdMessage(arduino, 'RF SW ON')
+		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "123954"):
 		    print 'got RF rfsw off'
 		    time.sleep(0.1)
@@ -462,10 +517,27 @@ def main():
 		    time.sleep(0.01)
 		    arduino.write('EC300')
 		    time.sleep(0.1)
-		    
-	    if(counterAlarm==45):counterAlarm=0
-	    
-	    counterAlarm += 0.1
+		    writeVfdMessage(arduino, 'RFSW OFF')
+		    time.sleep(0.5)
+	    elif arduinoMessage[0] == "VFDkey":
+		if(arduinoMessage[1] == "TA"):
+		    print "got vfd keyTA"
+		elif(arduinoMessage[1] == "PTY"):
+		    print "got vfd keyPTY"
+		elif(arduinoMessage[1] == "AF"):
+		    print "got vfd keyAF"
+		elif(arduinoMessage[1] == "Power"):
+		    print "got vfd keyPower"
+		elif(arduinoMessage[1] == "DSP"):
+		    print "got vfd keyDSP"
+		elif(arduinoMessage[1] == "MODE"):
+		    print "got vfd keyMODE"
+		elif(arduinoMessage[1] == "EQ"):
+		    print "got vfd keyEQ"
+		elif(arduinoMessage[1] == "SCN"):
+		    print "got vfd keySCN"
+	    if(counterAlarm > 45):	counterAlarm=0
+	    else: 			counterAlarm += 0.1
 	    
 	    if(counterAlarm==0):
 		my_timerList = timer.getTimer()
@@ -547,7 +619,12 @@ def mpdConnect(client, con_id):
     except SocketError:
         return False
     return True
-
+    
+def writeVfdMessage(arduino, message):
+    myEncodedMessage = encodeVFDMessage(message)
+    for addr, bits in myEncodedMessage.iteritems():
+	arduino.write('C' + chr(addr) + chr(bits) +'00')   
+    
 def encodeVFDMessage(message):
     message = message.upper()
     letters14v1_1 = {}    
@@ -632,6 +709,22 @@ def encodeVFDMessage(message):
     letters14v1_2['/'] = 0b00000100
     letters14v1_1[' '] = 0b00000000
     letters14v1_2[' '] = 0b00000000    
+    letters14v1_1['('] = 0b00010000
+    letters14v1_2['('] = 0b00000010
+    letters14v1_1[")"] = 0b00000100
+    letters14v1_2[')'] = 0b00000100
+    letters14v1_1["!"] = 0b00001000
+    letters14v1_2['!'] = 0b00000000
+    letters14v1_1["'"] = 0b00010000
+    letters14v1_2["'"] = 0b00000000
+    letters14v1_1["&"] = 0b11010101
+    letters14v1_2["&"] = 0b00011001
+    letters14v1_1[","] = 0b00000000
+    letters14v1_2[","] = 0b00000100
+    letters14v1_1["."] = 0b00000000
+    letters14v1_2["."] = 0b00000100
+    letters14v1_1["_"] = 0b00000000
+    letters14v1_2["_"] = 0b00001000
     addr = [12,13,15,16,18,19,21,22,24,25,27,28,30,31,33,34]
     returnDict = {}
     
@@ -641,8 +734,12 @@ def encodeVFDMessage(message):
     addrcnt=0
     
     while cnt < lim:
-	returnDict[addr[addrcnt]] = letters14v1_1[message[cnt]]
-	returnDict[addr[addrcnt+1]] = letters14v1_2[message[cnt]]
+	try:
+	  returnDict[addr[addrcnt]] = letters14v1_1[message[cnt]]
+	  returnDict[addr[addrcnt+1]] = letters14v1_2[message[cnt]]
+	except:
+	  returnDict[addr[addrcnt]] = 0
+	  returnDict[addr[addrcnt+ 1]] = 0
 	cnt = cnt+1
 	addrcnt = addrcnt+2
     
