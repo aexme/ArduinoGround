@@ -46,7 +46,9 @@ byte digits = 14;
 byte pulse_width = B00000011;  //0-7 Brightness
 
 int key1pin = 4;   
-int key2pin = 5;  
+int key2pin = 5; 
+int encpin = 3; 
+
 //******************
 
 // RF Link
@@ -58,7 +60,7 @@ boolean sw_state[] = {false, false, false, false};
 int akkuspannungpin = 1;   
 int spannung = 1000;       
 int debouncecount = 0;     
-int debouncecount_lim = 9000;  // command 4
+int debouncecount_lim = 12000;  // command 4
 int sw1_up_lim = 580;      // command 5
 int sw2_up_lim = 700;       // command 6
 int sw1_sw2_up_lim = 0;    // command 7
@@ -431,8 +433,10 @@ void getKeys(){
   
     int spannung1=0;
     int spannung2=0;
+    int spannung3=0;
     spannung1 = analogRead(key1pin);
     spannung2 = analogRead(key2pin);
+    spannung3 = analogRead(encpin);
 
     if(spannung1 < 250 && spannung1 > 220){
           Serial.println("VFDkey;TA;");
@@ -457,7 +461,34 @@ void getKeys(){
     }
     if(spannung1 < 820 && spannung1 > 780){
           Serial.println("VFDkey;SCN;");
-    }   
+    }  
+    if(spannung2 < 20){
+          Serial.println("VFDkey;1;");
+    } 
+    if(spannung2 < 185 && spannung2 > 150){
+          Serial.println("VFDkey;2;");
+    } 
+    if(spannung2 < 340 && spannung2 > 315){
+          Serial.println("VFDkey;3;");
+    } 
+    if(spannung2 < 500 && spannung2 > 470){
+          Serial.println("VFDkey;4;");
+    } 
+    if(spannung2 < 645 && spannung2 > 615){
+          Serial.println("VFDkey;5;");
+    } 
+    if(spannung2 < 765 && spannung2 > 730){
+          Serial.println("VFDkey;6;");
+    } 
+    if(spannung2 < 1015 && spannung2 > 985){
+          Serial.println("VFDkey;8;");
+    } 
+    if(spannung2 < 870 && spannung2 > 840){
+          Serial.println("VFDkey;BAND;");
+    } 
+     if(spannung2 < 955 && spannung2 > 925){
+          Serial.println("VFDkey;9;");
+    } 
 }
 
 void setVFD(byte addr, byte data){

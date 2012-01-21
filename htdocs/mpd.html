@@ -53,7 +53,10 @@
 	}
 	getstats();
     }
+    functio saveiRadio(){
 
+    
+    }
 </script>
 
 </head>
@@ -87,16 +90,21 @@
 <p>		<div id = "time">
 			nothing to see
 		</div>
+</p>	
+	  <button onClick=mpdCommand('play')>Play</button>
 	  <button onClick=mpdCommand('pause')>Pause</button>
 	  <button onClick=mpdCommand('next')>Next</button>
 	  <button onClick=mpdCommand('previous')>Prevoius</button>
 	  <button onClick=mpdCommand('stop')>Stop</button><br>
-</p>	
-	  <button onClick=loadXMLDoc('cmd/D/1/0/0/0','status')>Switch 1 on</button>
-	  <button onClick=loadXMLDoc('cmd/D/1/1/0/0','status')>Switch 1 off</button>
-	  <button onClick=loadXMLDoc('cmd/D/2/0/0/0','status')>Switch 2 on</button>
-	  <button onClick=loadXMLDoc('cmd/D/2/1/0/0','status')>Switch 2 off</button>	
-	
+<form name="iRadio">
+	  iRadio 1 <input name="iradio1" type="text" size="30"><br>
+	  iRadio 2 <input name="iradio2" type="text" size="30"><br>
+	  iRadio 3 <input name="iradio3" type="text" size="30"><br>
+	  iRadio 4 <input name="iradio4" type="text" size="30"><br>
+	  iRadio 5 <input name="iradio5" type="text" size="30"><br>
+	  iRadio 6 <input name="iradio6" type="text" size="30"><br>
+	  <button onClick=saveiRadio()>Save</button>
+</form>
 	</div>
 <div id='status'>
 </div>

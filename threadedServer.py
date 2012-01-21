@@ -14,6 +14,7 @@ import threading
 import thread
 import ConfigParser
 import csv
+import urllib
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -165,8 +166,14 @@ class MyMPDClient():
 
     def getStatus(self):
 	return self.client.status()
-
-
+    
+    def add(self, item):
+	self.client.add(item)
+    
+    def playlist(self):
+	return self.client.playlist()
+	
+	
 class MyRequestHandler(SocketServer.BaseRequestHandler):
 
     def handle(self):
@@ -310,6 +317,12 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    elif(command[2]=="play"):
 		self.mpdclient.play();
 		s='OK'
+	    elif(command[2]=="iRadio"):
+		if command[3] == 'set':
+		    pass
+		elif command[3]=='play':
+		    pass
+		s='OK'
 
 	    elif(command[2]=="time"):
 		if(command[3] == "0"):
@@ -419,6 +432,31 @@ def main():
       vfdMessagecnt = 0
       vfdTimer = 0
       loadingsymbol = 32
+      
+      trance = 'http://listen.di.fm/public3/trance.pls'
+      
+      items = parsePLS(trance)
+      i=1
+      
+      playlist =  mympdClient.client.playlistid()
+      itemInPlaylist = false
+      for pos in playlist:
+	    if pos['file'] == items[1]:
+		mympdClient.client.playid(int(pos['id']))
+		itemInPlaylist = True
+		break
+		
+      if !itemInPlaylist:
+	    while i <= len(items):
+		mympdClient.add(items[i])
+		i+=1
+		
+	    playlist =  mympdClient.client.playlistid()
+	    for pos in playlist:
+		if pos['file'] == items[1]:
+		    mympdClient.client.playid(int(pos['id']))		    
+		    break
+      
       while True:
 	
 	    time.sleep(0.1)
@@ -534,8 +572,24 @@ def main():
 		    print "got vfd keyMODE"
 		elif(arduinoMessage[1] == "EQ"):
 		    print "got vfd keyEQ"
-		elif(arduinoMessage[1] == "SCN"):
-		    print "got vfd keySCN"
+		elif(arduinoMessage[1] == "1"):
+		    print "got vfd key1"
+		elif(arduinoMessage[1] == "2"):
+		    print "got vfd key2"
+		elif(arduinoMessage[1] == "3"):
+		    print "got vfd key3"
+		elif(arduinoMessage[1] == "4"):
+		    print "got vfd key4"
+		elif(arduinoMessage[1] == "5"):
+		    print "got vfd key5"
+		elif(arduinoMessage[1] == "6"):
+		    print "got vfd key6"
+		elif(arduinoMessage[1] == "8"):
+		    print "got vfd key8"
+		elif(arduinoMessage[1] == "BAND"):
+		    print "got vfd keyBAND"
+		elif(arduinoMessage[1] == "9"):
+		    print "got vfd key9"		
 	    if(counterAlarm > 45):	counterAlarm=0
 	    else: 			counterAlarm += 0.1
 	    
@@ -625,6 +679,22 @@ def writeVfdMessage(arduino, message):
     for addr, bits in myEncodedMessage.iteritems():
 	arduino.write('C' + chr(addr) + chr(bits) +'00')   
     
+def parsePLS(url):
+      opener = urllib.FancyURLopener({})
+      f = opener.open(url)
+
+      config = ConfigParser.RawConfigParser()
+      config.readfp(f)
+      numberOfItems = int(config.get('playlist', 'NumberOfEntries'))
+      
+      i=1
+      items = {}
+      while i <= numberOfItems:
+	  items[i] = config.get('playlist', 'File' + str(i))
+	  i +=1
+	  
+      return items
+
 def encodeVFDMessage(message):
     message = message.upper()
     letters14v1_1 = {}    
