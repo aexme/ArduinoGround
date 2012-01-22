@@ -9,10 +9,11 @@
 
     function getstats()
     {
- 	loadXMLDoc('mpd/currentsong/0/0/0/0', 'title');
-	loadXMLDoc('mpd/time/0/0/0/0', 'time');
-	loadXMLDoc('sys/cpuLoad/0/0/0/0', 'cpuLoad');
-	loadXMLDoc('sys/meminfo/0/0/0/0', 'meminfo');
+ 	loadXMLDoc('mpd/currentsong&0', 'title');
+	loadXMLDoc('mpd/time&0', 'time');
+	loadXMLDoc('sys/cpuLoad', 'cpuLoad');
+	loadXMLDoc('sys/meminfo', 'meminfo');
+	loadXMLDoc('mpd/iRadio&get', 'iradioInput');
     }
 
     function loadXMLDoc(url, id)
@@ -41,21 +42,39 @@
 
     function mpdCommand(cmd){
 	if(cmd=='play'){
-	    loadXMLDoc('mpd/play/1/0/0/0','status');
+	    loadXMLDoc('mpd/play&1','status');
 	}else if(cmd=='stop'){
-	    loadXMLDoc('mpd/stop/1/0/0/0','status');
+	    loadXMLDoc('mpd/stop&1','status');
 	}else if(cmd=='next'){
-	    loadXMLDoc('mpd/next/1/0/0/0','status');
+	    loadXMLDoc('mpd/next&1','status');
 	}else if(cmd=='pause'){
-	    loadXMLDoc('mpd/pause/1/0/0/0','status');
+	    loadXMLDoc('mpd/pause&1','status');
 	}else if(cmd=='previous'){
-	    loadXMLDoc('mpd/previous/1/0/0/0','status');
+	    loadXMLDoc('mpd/previous&1','status');
 	}
 	getstats();
     }
-    functio saveiRadio(){
+    function saveiRadio(){
+	
+	var iradio1URL = escape(document.iRadio.iradio1.value);
+	var iradio2URL = escape(document.iRadio.iradio2.value);
+	var iradio3URL = escape(document.iRadio.iradio3.value);
+	var iradio4URL = escape(document.iRadio.iradio4.value);
+	var iradio5URL = escape(document.iRadio.iradio5.value);
+	var iradio6URL = escape(document.iRadio.iradio6.value);
+	
+	loadXMLDoc('mpd/iRadio&set&1&' + iradio1URL,'status');
+	loadXMLDoc('mpd/iRadio&set&2&' + iradio2URL,'status');
+	loadXMLDoc('mpd/iRadio&set&3&' + iradio3URL,'status');
+	loadXMLDoc('mpd/iRadio&set&4&' + iradio4URL,'status');
+	loadXMLDoc('mpd/iRadio&set&5&' + iradio5URL,'status');
+	loadXMLDoc('mpd/iRadio&set&6&' + iradio6URL,'status');
+	
+	getstats();
+    }
+    function playiRadio(id){
+	loadXMLDoc('mpd/iRadio&play&' + id,'status');
 
-    
     }
 </script>
 
@@ -91,20 +110,27 @@
 			nothing to see
 		</div>
 </p>	
-	  <button onClick=mpdCommand('play')>Play</button>
-	  <button onClick=mpdCommand('pause')>Pause</button>
-	  <button onClick=mpdCommand('next')>Next</button>
-	  <button onClick=mpdCommand('previous')>Prevoius</button>
-	  <button onClick=mpdCommand('stop')>Stop</button><br>
-<form name="iRadio">
-	  iRadio 1 <input name="iradio1" type="text" size="30"><br>
-	  iRadio 2 <input name="iradio2" type="text" size="30"><br>
-	  iRadio 3 <input name="iradio3" type="text" size="30"><br>
-	  iRadio 4 <input name="iradio4" type="text" size="30"><br>
-	  iRadio 5 <input name="iradio5" type="text" size="30"><br>
-	  iRadio 6 <input name="iradio6" type="text" size="30"><br>
-	  <button onClick=saveiRadio()>Save</button>
+
+	  <input type="button" onClick="mpdCommand('play'); return false;" value="Play" />
+	  <input type="button" onClick="mpdCommand('pause'); return false;" value="Pause" />
+	  <input type="button" onClick="mpdCommand('next'); return false;" value="Next" />
+	  <input type="button" onClick="mpdCommand('previous'); return false;" value="Previous" />
+	  <input type="button" onClick="mpdCommand('stop'); return false;" value="Stop" /><br>
+
+<form name="iRadio" action="">
+	  <div id="iradioInput">
+	      iRadio 1 <input name="iradio1" type="text" size="30"><button onClick=playiRadio(1)>play</button><br>
+	      iRadio 2 <input name="iradio2" type="text" size="30"><button onClick=playiRadio(2)>play</button><br>
+	      iRadio 3 <input name="iradio3" type="text" size="30"><button onClick=playiRadio(3)>play</button><br>
+	      iRadio 4 <input name="iradio4" type="text" size="30"><button onClick=playiRadio(4)>play</button><br>
+	      iRadio 5 <input name="iradio5" type="text" size="30"><button onClick=playiRadio(5)>play</button><br>
+	      iRadio 6 <input name="iradio6" type="text" size="30"><button onClick=playiRadio(6)>play</button><br>
+	  </div>
+	  <input type="button" onClick="saveiRadio(); return false;" value="Save" />
 </form>
+	  
+	  
+
 	</div>
 <div id='status'>
 </div>

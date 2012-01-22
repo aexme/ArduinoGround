@@ -21,6 +21,7 @@ PORT = '6600'
 PASSWORD = False
 ##
 CON_ID = {'host':HOST, 'port':PORT}
+iRadioURL = {1:'',2:'',3:'',4:'',5:'',6:''}
 
 class MyArduino():
     def __init__(self):
@@ -51,7 +52,80 @@ class MyArduino():
 
       return 
 
+class IRadio():
+    
+    def __init__(self):
+	self.iradioList = {'1' : ' ', '2' : ' ', '3' : ' ', '4' : ' ', '5' : ' ', '6':' '}
+	self.loadList()
+	
+    def loadList(self):
+	iradioFile = open('iradio.cfg', 'r')
+
+	for line in iradioFile:
+	    timerLine = line.split(';')
+	    if (line!=''):		
+		self.iradioList[timerLine[0]] = timerLine[1]
+
+	iradioFile.close()
+	
+    def updateTimerList(self):
+	self.loadList()
+    
+    def getIRadio(self, name=''):	
+	if(name == ''): 
+	    return self.iradioList
+	else:	
+	    return self.iradioList[name]
+	    
+    def addIRadio(self,_id, pls):	
+	self.iradioList[_id] = pls
+	
+    def writeConfig(self):
+	iradioFile = open('iradio.cfg', 'w')
+	for _id, url in self.iradioList.iteritems():
+	    if (url == ' ' or url == "\n" or url == '' ):
+		print "not again!"
+	    else: iradioFile.write(_id + ";" + url + '\n')
+    
+    def deleteRadio(self, _id):
+	del self.iradioList[_id]
+	
+    def parsePLS(self, url):
+      
+      tmp = url.split('.')
+      last = len(tmp)-1
+      opener = urllib.FancyURLopener({})
+      f = opener.open(url)
+      i=1
+      items = {}
+      
+      if tmp[last].lower().rstrip() == 'pls':
+
+	  config = ConfigParser.RawConfigParser()
+	  config.readfp(f)
+	  numberOfItems = int(config.get('playlist', 'NumberOfEntries'))
+	  
+	  while i <= numberOfItems:
+	      items[i] = config.get('playlist', 'File' + str(i))
+	      i +=1    
+	  
+      elif tmp[last].lower().rstrip() == 'm3u':  
+	  while True:
+	    line = f.readline()
+	    lineSplit = line.split(':')
+	    if (lineSplit[0].lower().rstrip() == 'http'):
+		if line!=' ': items[i] = line.rstrip()
+		i+=1
+	    if line=='':
+		break
+      else: items[1] = url.rstrip()
+		
+      f.close()
+      return items
+	  
+	
 class MyTimer():
+  
     def __init__(self):
 	self.timerList = {}
 	self.loadTimer()
@@ -172,8 +246,21 @@ class MyMPDClient():
     
     def playlist(self):
 	return self.client.playlist()
+      
+    def getPlaylistid(self):
+	return self.client.playlistid()
 	
-	
+    def playId(self,_id):
+	self.client.playid(_id)
+    
+    def getItemIdInPLaylist(self, item):
+      
+	playlist =  self.getPlaylistid()
+	for pos in playlist:
+	      if pos['file'] == item:
+		  return pos['id']
+	return '-1'
+    
 class MyRequestHandler(SocketServer.BaseRequestHandler):
 
     def handle(self):
@@ -183,7 +270,8 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	self.mpdclient = self.server.mympdClient
 	self.lock = self.server.lock
 	self.timer = self.server.timer
-
+	self.iradio = self.server.iradio
+	
 	data = self.request.recv(100)
 	self.cpuLoad = [0,0,0,0]
 	
@@ -206,41 +294,42 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    if self.unixpath1 == "/1.1":
 		self.unixpath1 = "/index.html"      
 	  
-	if command[1] == "":
-	    command[1] = "index.html"	    
-		
-	if command[1] == "cmd":
-	    print "+ Attempting to send cmd "+ self.unixpath1 +"\n"
-	    if len(command) > 6:
+	if command[1] == "": command[1] = "index.html"	 
 
+	if command[1] == "cmd":
+	    if len(command)>2: parameter = command[2].split('&')
+	    print "+ Attempting to send cmd "+ self.unixpath1 +"\n"
+
+	    if len(parameter) > 4:
 		try:
-		    self.arduino.write(command[2]+command[3]+command[4]+command[5]+command[6]+'\0')
+		    self.arduino.write(parameter[0]+parameter[1]+parameter[2]+parameter[3]+parameter[4]+'\0')
 		    self.request.send("cmd sent")
 		    time.sleep(0.01)		    
 		except:
 		    time.sleep(0)
 		    
 	elif command[1] == "alarm":
-	    if(command[2] == "set"):
+	    if len(command)>2: parameter = command[2].split('&')
+	    if(parameter[0] == "set"):
 		self.lock.acquire() 
-		self.timer.addTimer(command[3] + ';' + command[4] + ';' + command[5] + ';' + command[6])
+		self.timer.addTimer(parameter[1] + ';' + parameter[2] + ';' + parameter[3] + ';' + parameter[4])
 		self.timer.writeConfig()
 		self.lock.release()
 		s = "OK"
 	    
-	    elif(command[2] == "rm"):
+	    elif(parameter[0] == "rm"):
 		self.lock.acquire() 
-		self.timer.deleteTimer(command[3])
+		self.timer.deleteTimer(parameter[1])
 		self.lock.release()
 		s = "OK"
-	    elif(command[2] == "flip"):
+	    elif(parameter[0] == "flip"):
 		self.lock.acquire() 
-		self.timer.flipTimer(command[3])
+		self.timer.flipTimer(parameter[1])
 		self.timer.writeConfig()
 		self.lock.release()
 		s= "OK"
 		
-	    elif(command[2] == "get"):
+	    elif(parameter[0] == "get"):
 		self.timerList = self.timer.getTimer()
 		s=' '
 		
@@ -274,8 +363,10 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    self.request.send(s)
 		
 	elif command[1] == "mpd":
-
-	    if(command[2]=="currentsong"):
+	    
+	    if len(command)>2: parameter = command[2].split('&')
+	    
+	    if(parameter[0]=="currentsong"):
 		self.lock.acquire() 
 		mpd_currentSong = self.mpdclient.getCurrentsong()
 		time.sleep(0.001)
@@ -291,41 +382,60 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		except:
 		    print "Failed to connect on"
 		    		    
-		if(command[3]=='0'):
+		if(parameter[1]=='0'):
 		    s = '<div id ="title">' + mpd_currentSong['title'] + '</div></br><div id = "name">' + name + "</div>"
 		    print "+ Attempting to send mpdStats " + s +"\n"    
-		elif(command[3]=="1"):
+		elif(parameter[1]=="1"):
 		    s = name
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		    
-		elif(command[3]=="2"):
+		elif(parameter[1]=="2"):
 		    s = mpd_currentSong['title']
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 	    
-	    elif(command[2]=="pause"):
+	    elif(parameter[0]=="pause"):
 		self.mpdclient.pause();
 		s='OK'
-	    elif(command[2]=="previous"):
+	    elif(parameter[0]=="previous"):
 		self.mpdclient.previous();
 		s='OK'
-  	    elif(command[2]=="next"):
+  	    elif(parameter[0]=="next"):
 		self.mpdclient._next();
 		s='OK'
-	    elif(command[2]=="stop"):
+	    elif(parameter[0]=="stop"):
 		self.mpdclient.stop();
 		s='OK'
-	    elif(command[2]=="play"):
+	    elif(parameter[0]=="play"):
 		self.mpdclient.play();
 		s='OK'
-	    elif(command[2]=="iRadio"):
-		if command[3] == 'set':
-		    pass
-		elif command[3]=='play':
-		    pass
-		s='OK'
-
-	    elif(command[2]=="time"):
-		if(command[3] == "0"):
+	    elif(parameter[0]=="iRadio"):
+		print "iradio"
+		print parameter
+		
+		if parameter[1] == 'set':
+		    url = urllib.unquote(splitURL[1].split('&')[3])
+		    self.iradio.addIRadio(parameter[2], url)
+		    self.iradio.writeConfig()
+		    s='OK'
+		elif parameter[1]=='play':		  
+		    playIradio(self.iradio, self.mpdclient, parameter[2])
+		    s='OK'
+		elif parameter[1]=='get':  
+		    
+		    self.iradioList = self.iradio.getIRadio()
+		    s=''
+		    for _id, url in self.iradioList.iteritems():
+			  
+			  if (_id == ' ' or url == "\n"):
+			      print "not again!"
+			  else: 			      
+			      s += 'iRadio ' + _id + ' <input name="iradio' + _id
+			      s += '" type="text" size="30" value="' + url + '">'
+			      s += '<input type="button" onClick="playiRadio(' + _id + '); return false;" value="play" /><br>'
+		else: s='NotOK'
+		
+	    elif(parameter[0]=="time"):
+		if(parameter[1] == "0"):
 
 		    self.lock.acquire()
 		    self.mpd_status = self.mpdclient.getStatus()
@@ -342,23 +452,24 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		    s = "%.2d" % mm1 + ":" + "%.2d" % sec1 + " / " + "%.2d" % mm2 + ":" + "%.2d" % sec2
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		    
-		elif(command[3]=="1"): 
+		elif(parameter[1]=="1"): 
 		    s = mpd_status['time']		      
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		
-		elif(command[3]=="2"):
+		elif(parameter[1]=="2"):
 		    s = mpd_status['elapsed']
 		    print "+ Attempting to send mpdStats "+ s +"\n"
 		  
 	    self.request.send(s)
 	
-	elif command[1] == "sys":
-	    if command[2] == "cpuLoad":
+	elif command[1] == "sys":	  
+	    if len(command)>2: parameter = command[2].split('&')
+	    if parameter[0] == "cpuLoad":
 		self.cpuLoad = deltaTime(1)
 	    	    
 		cpuPct = 100 - (self.cpuLoad[len(self.cpuLoad) - 1] * 100.00 / sum(self.cpuLoad))
 		s = "CPU Load: " +  str('%.2f' %cpuPct) +"%"
-	    elif command[2] == "meminfo":
+	    elif parameter[0] == "meminfo":
 		meminfo = getMeminfo()
 		s = 'Free Memory: ' + meminfo[1] + ' / ' + meminfo[0] 
 	    
@@ -379,7 +490,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 		  self.request.sendall( data )		
 	else:
 		print "+ File was not found!\n"
-		self.request.send("<html><head><title>404</title></head><body><h1>404 File not Found</h1><br />The file you requested was not found on the server<hr /><small>Affix’ Simple Python HTTP Server 0.0.1</small></body></html>")
+		self.request.send("<html><head><title>404</title></head><body><h1>404 File not Found</h1>The file you requested was not found on the server</body></html>")
 	self.request.close()
 
     
@@ -411,6 +522,8 @@ def main():
       mympdClient = MyMPDClient()
       lock=thread.allocate_lock()
       timer = MyTimer()
+      iradio = IRadio()
+      
       myServer = TCPServer(("", 8001), MyRequestHandler)
       myServer_thread = threading.Thread(target=myServer.serve_forever)
       myServer_thread.setDaemon(True)
@@ -419,49 +532,34 @@ def main():
       myServer.mympdClient = mympdClient
       myServer.lock = lock
       myServer.timer = timer
+      myServer.iradio = iradio
       
       weekdayArray = ['Mo','Di','Mi','Do','Fr','Sa','So']
       myAlarmTime = []
       counterAlarm = 0
-
-      cnt = 0
-      while cnt<41:
-	  arduino.write('C' + chr(cnt) + chr(0) +'00')  
-	  cnt = cnt + 1
-      
       vfdMessagecnt = 0
       vfdTimer = 0
       loadingsymbol = 32
+      vfdON = True
       
-      trance = 'http://listen.di.fm/public3/trance.pls'
-      
-      items = parsePLS(trance)
-      i=1
-      
-      playlist =  mympdClient.client.playlistid()
-      itemInPlaylist = false
-      for pos in playlist:
-	    if pos['file'] == items[1]:
-		mympdClient.client.playid(int(pos['id']))
-		itemInPlaylist = True
-		break
-		
-      if !itemInPlaylist:
-	    while i <= len(items):
-		mympdClient.add(items[i])
-		i+=1
-		
-	    playlist =  mympdClient.client.playlistid()
-	    for pos in playlist:
-		if pos['file'] == items[1]:
-		    mympdClient.client.playid(int(pos['id']))		    
-		    break
+      # VFD leeren
+      cnt = 0
+      while cnt<41:
+	  arduino.write('C' + chr(cnt) + chr(0) +'00')  
+	  cnt = cnt + 1                              
       
       while True:
 	
 	    time.sleep(0.1)
-	    if vfdTimer>3: vfdTimer=0  
-	    if vfdTimer==0:
+	    if vfdTimer>3: vfdTimer=0
+	    if vfdON==False:
+		# VFD leeren
+		cnt = 0
+		while cnt<41:
+		    arduino.write('C' + chr(cnt) + chr(0) +'00')  
+		    cnt = cnt + 1
+	    
+	    if vfdTimer == 0 and vfdON == True:
 		mpd_currentSong = mympdClient.getCurrentsong()
 		s = "        "
 		noartistname=0		       
@@ -491,7 +589,7 @@ def main():
 		vfdMessagecnt +=1    
 		
 		arduino.write('C' + chr(10) + chr(4) +'00') # classic stereo sign
-		arduino.write('C' + chr(39) + chr(1) +'00') # circle sign
+		arduino.write('C' + chr(39) + chr(1) +'00') # CD sign
 		arduino.write('C' + chr(9) + chr(loadingsymbol+1) +'00') # circle sign
 		if loadingsymbol < 128:
 		    loadingsymbol  *=2 
@@ -501,45 +599,56 @@ def main():
 	    arduinoMessage = arduino.read().split(';')
 
 	    if(arduinoMessage[0] == "RF"):
+		time.sleep(0.2)
 		if(arduinoMessage[1] == "118772"):
-		    print 'got RF cmd mpd pause'
-		    writeVfdMessage(arduino, ' PAUSE  ')		    		   
+		    writeVfdMessage(arduino, ' PAUSE  ')
 		    mympdClient.pause()
-		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "118770"):
-		    print 'got RF mpd play'
-		    writeVfdMessage(arduino, '  PLAY  ')		    
+		    writeVfdMessage(arduino, '  PLAY  ')
 		    mympdClient.play()
-		    time.sleep(0.5)		    
+		elif(arduinoMessage[1] == "118610"):
+		    writeVfdMessage(arduino, 'RADIO 1 ')
+		    playIradio(iradio, mympdClient, '1')		    
+		elif(arduinoMessage[1] == "118608"):
+		    playIradio(iradio, mympdClient, '2')
+		    writeVfdMessage(arduino, 'RADIO 2 ')
+		elif(arduinoMessage[1] == "122984"):
+		    writeVfdMessage(arduino, 'RADIO 3 ')
+		    playIradio(iradio, mympdClient, '3')		    
+		elif(arduinoMessage[1] == "122982"):
+		    writeVfdMessage(arduino, 'RADIO 4 ')
+		    playIradio(iradio, mympdClient, '4')
+		elif(arduinoMessage[1] == "120068"):
+		    writeVfdMessage(arduino, 'RADIO 5 ')
+		    playIradio(iradio, mympdClient, '5')	    
+		elif(arduinoMessage[1] == "120066"):
+		    writeVfdMessage(arduino, 'RADIO 6 ')
+		    playIradio(iradio, mympdClient, '6')
+		elif(arduinoMessage[1] == "123146"):
+		    if not vfdON:	writeVfdMessage(arduino, ' VFD ON ')
+		    else: 		writeVfdMessage(arduino, 'VFD OFF ')
+		    vfdON = not vfdON
 		elif(arduinoMessage[1] == "123144"):
-		    print 'got RF mpd stop'
-		    writeVfdMessage(arduino, '  STOP  ')		    
+		    writeVfdMessage(arduino, '  STOP  ')
 		    mympdClient.stop()
-		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "120230"):
-		    print 'got RF mpd previous'
-		    writeVfdMessage(arduino, '  PREV  ')		    
+		    writeVfdMessage(arduino, '  PREV  ')
 		    mympdClient.previous()
-		    time.sleep(0.5)		    
 		elif(arduinoMessage[1] == "120228"):
-		    print 'got RF mpd next'
 		    mympdClient._next()
-		    writeVfdMessage(arduino, '  NEXT  ')		    
-		    time.sleep(0.5)		    
+		    writeVfdMessage(arduino, '  NEXT  ')    
 		elif(arduinoMessage[1] == "122498"):
 		    print 'got RF sw on'
 		    time.sleep(0.1)
 		    arduino.write('D1000')
-		    time.sleep(0.1)		  
+		    time.sleep(0.1)
 		    writeVfdMessage(arduino, ' SW ON  ')
-		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "122496"):
 		    print 'got RF sw off'
 		    time.sleep(0.1)
-		    arduino.write('D1100')		    
+		    arduino.write('D1100') 
 		    time.sleep(0.1)
 		    writeVfdMessage(arduino, ' SW OFF ')
-		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "123956"):
 		    print 'got RF rfsw on'
 		    time.sleep(0.1)
@@ -547,7 +656,6 @@ def main():
 		    arduino.write('EC310')
 		    time.sleep(0.1)
 		    writeVfdMessage(arduino, 'RF SW ON')
-		    time.sleep(0.5)
 		elif(arduinoMessage[1] == "123954"):
 		    print 'got RF rfsw off'
 		    time.sleep(0.1)
@@ -556,40 +664,41 @@ def main():
 		    arduino.write('EC300')
 		    time.sleep(0.1)
 		    writeVfdMessage(arduino, 'RFSW OFF')
-		    time.sleep(0.5)
+		time.sleep(0.5)
 	    elif arduinoMessage[0] == "VFDkey":
+		time.sleep(0.2)
 		if(arduinoMessage[1] == "TA"):
-		    print "got vfd keyTA"
+		    writeVfdMessage(arduino, '  PLAY  ')
+		    mympdClient.play()
 		elif(arduinoMessage[1] == "PTY"):
-		    print "got vfd keyPTY"
+		    writeVfdMessage(arduino, ' PAUSE  ')
+		    mympdClient.pause()
 		elif(arduinoMessage[1] == "AF"):
 		    print "got vfd keyAF"
 		elif(arduinoMessage[1] == "Power"):
 		    print "got vfd keyPower"
 		elif(arduinoMessage[1] == "DSP"):
-		    print "got vfd keyDSP"
+		    if not vfdON:	writeVfdMessage(arduino, ' VFD ON ')
+		    else: 	writeVfdMessage(arduino, 'VFD OFF ')
+		    vfdON = not vfdON
 		elif(arduinoMessage[1] == "MODE"):
 		    print "got vfd keyMODE"
 		elif(arduinoMessage[1] == "EQ"):
 		    print "got vfd keyEQ"
-		elif(arduinoMessage[1] == "1"):
-		    print "got vfd key1"
-		elif(arduinoMessage[1] == "2"):
-		    print "got vfd key2"
-		elif(arduinoMessage[1] == "3"):
-		    print "got vfd key3"
-		elif(arduinoMessage[1] == "4"):
-		    print "got vfd key4"
-		elif(arduinoMessage[1] == "5"):
-		    print "got vfd key5"
-		elif(arduinoMessage[1] == "6"):
-		    print "got vfd key6"
+		elif(arduinoMessage[1] >= "1" and arduinoMessage[1] <= "6"):
+		    playIradio(iradio, mympdClient, arduinoMessage[1])
+		    writeVfdMessage(arduino, 'RADIO ' + arduinoMessage[1] + ' ')
 		elif(arduinoMessage[1] == "8"):
+		    mympdClient.previous()
+		    writeVfdMessage(arduino, '  PREV  ')
 		    print "got vfd key8"
 		elif(arduinoMessage[1] == "BAND"):
-		    print "got vfd keyBAND"
+		    mympdClient.stop()
+		    writeVfdMessage(arduino, '  STOP  ')
 		elif(arduinoMessage[1] == "9"):
-		    print "got vfd key9"		
+		    mympdClient._next()
+		    writeVfdMessage(arduino, '  NEXT  ')  
+		time.sleep(0.5)
 	    if(counterAlarm > 45):	counterAlarm=0
 	    else: 			counterAlarm += 0.1
 	    
@@ -636,7 +745,7 @@ def main():
 #E31	119582
 #E40	123954
 #E41	123956
-
+# MPDRadio
 #E50	118608
 #E51	118610
 #E60	122982
@@ -654,7 +763,7 @@ def main():
 #EB1	119740
 #EC0	124116
 #EC1	124118
-
+# MPD
 #ED0	118770
 #ED1	118772
 #EE0	123144
@@ -678,22 +787,21 @@ def writeVfdMessage(arduino, message):
     myEncodedMessage = encodeVFDMessage(message)
     for addr, bits in myEncodedMessage.iteritems():
 	arduino.write('C' + chr(addr) + chr(bits) +'00')   
-    
-def parsePLS(url):
-      opener = urllib.FancyURLopener({})
-      f = opener.open(url)
 
-      config = ConfigParser.RawConfigParser()
-      config.readfp(f)
-      numberOfItems = int(config.get('playlist', 'NumberOfEntries'))
-      
-      i=1
-      items = {}
-      while i <= numberOfItems:
-	  items[i] = config.get('playlist', 'File' + str(i))
-	  i +=1
-	  
-      return items
+def playIradio(iradio, mympdClient, _id):
+    
+    url = iradio.getIRadio(_id)
+    items = iradio.parsePLS(url)
+    itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
+    if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
+    else:
+	  i=1
+	  while i <= len(items):
+	      mympdClient.add(items[i])
+	      i+=1
+	      
+	  itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
+	  if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
 
 def encodeVFDMessage(message):
     message = message.upper()

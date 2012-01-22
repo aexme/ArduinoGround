@@ -17,7 +17,7 @@
       var channel=document.demo.channel.options[channel_number].text;
       var number=document.demo.number.options[number_number].text;    
 
-      loadXMLDoc('cmd/E/' + channel+ '/' + number + '/' + state +'/0','status');
+      loadXMLDoc('cmd/E&' + channel+ '&' + number + '&' + state +'&0','status');
     }
   }
 
@@ -65,12 +65,12 @@
 	<div id="content">
 	  <h1>My First Heading</h1>
 
-	  <button onClick=loadXMLDoc('cmd/E/C/1/0/0','status')>RFSwitch 1 off</button>
-	  <button onClick=loadXMLDoc('cmd/E/C/1/1/0','status')>RFSwitch 1 on</button>
-	  <button onClick=loadXMLDoc('cmd/E/C/2/0/0','status')>RFSwitch 2 off</button>
-	  <button onClick=loadXMLDoc('cmd/E/C/2/1/0','status')>RFSwitch 2 on</button>
-	  <button onClick=loadXMLDoc('cmd/E/C/3/0/0','status')>RFSwitch 3 off</button>
-	  <button onClick=loadXMLDoc('cmd/E/C/3/1/0','status')>RFSwitch 3 on</button>	
+	  <button onClick=loadXMLDoc('cmd/E&C&1&0&0','status')>RFSwitch 1 off</button>
+	  <button onClick=loadXMLDoc('cmd/E&C&1&1&0','status')>RFSwitch 1 on</button>
+	  <button onClick=loadXMLDoc('cmd/E&C&2&0&0','status')>RFSwitch 2 off</button>
+	  <button onClick=loadXMLDoc('cmd/E&C&2&1&0','status')>RFSwitch 2 on</button>
+	  <button onClick=loadXMLDoc('cmd/E&C&3&0&0','status')>RFSwitch 3 off</button>
+	  <button onClick=loadXMLDoc('cmd/E&C&3&1&0','status')>RFSwitch 3 on</button>	
 
 	    <p>
 	    <form name="demo" action="">

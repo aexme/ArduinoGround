@@ -22,7 +22,7 @@
 	  
 	  unixtime = (parseInt(hour) - 1) * 3600 + parseInt(minute) * 60;
       
-	  loadXMLDoc('alarm/set/' + name + '/' + unixtime + '/' + repeatValue + '/1', 'status');
+	  loadXMLDoc('alarm/set&' + name + '&' + unixtime + '&' + repeatValue + '&1', 'status');
 
 	  getAlarm()
 
@@ -53,16 +53,16 @@
 
       function getAlarm()
       {
-	loadXMLDoc("alarm/get/0/0/0/0", "timer");	
+	loadXMLDoc("alarm/get", "timer");	
       }
 
     function rmTimer(timer){
-	loadXMLDoc('alarm/rm/' + timer + '/0/0', 'status');
+	loadXMLDoc('alarm/rm&' + timer + '&0&0', 'status');
 	getAlarm();
     }
 
     function flipTimer(timer){
-	loadXMLDoc('alarm/flip/' + timer + '/0/0', 'status');
+	loadXMLDoc('alarm/flip&' + timer + '&0&0', 'status');
 	getAlarm();
     }
 

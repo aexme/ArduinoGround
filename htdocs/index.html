@@ -9,10 +9,10 @@
 
     function getstats()
     {
- 	loadXMLDoc('mpd/currentsong/0/0/0/0', 'title');
-	loadXMLDoc('mpd/time/0/0/0/0', 'time');
-	loadXMLDoc('sys/cpuLoad/0/0/0/0', 'cpuLoad');
-	loadXMLDoc('sys/meminfo/0/0/0/0', 'meminfo');
+ 	loadXMLDoc('mpd/currentsong&0', 'title');
+	loadXMLDoc('mpd/time&0', 'time');
+	loadXMLDoc('sys/cpuLoad', 'cpuLoad');
+	loadXMLDoc('sys/meminfo', 'meminfo');
     }
 
     function loadXMLDoc(url, id)
@@ -41,15 +41,15 @@
 
     function mpdCommand(cmd){
 	if(cmd=='play'){
-	    loadXMLDoc('mpd/play/1/0/0/0','status');
+	    loadXMLDoc('mpd/play','status');
 	}else if(cmd=='stop'){
-	    loadXMLDoc('mpd/stop/1/0/0/0','status');
+	    loadXMLDoc('mpd/stop','status');
 	}else if(cmd=='next'){
-	    loadXMLDoc('mpd/next/1/0/0/0','status');
+	    loadXMLDoc('mpd/next','status');
 	}else if(cmd=='pause'){
-	    loadXMLDoc('mpd/pause/1/0/0/0','status');
+	    loadXMLDoc('mpd/pause','status');
 	}else if(cmd=='previous'){
-	    loadXMLDoc('mpd/previous/1/0/0/0','status');
+	    loadXMLDoc('mpd/previous&','status');
 	}
 	getstats();
     }
@@ -92,10 +92,10 @@
 	  <button onClick=mpdCommand('previous')>Prevoius</button>
 	  <button onClick=mpdCommand('stop')>Stop</button><br>
 </p>	
-	  <button onClick=loadXMLDoc('cmd/D/1/0/0/0','status')>Switch 1 on</button>
-	  <button onClick=loadXMLDoc('cmd/D/1/1/0/0','status')>Switch 1 off</button>
-	  <button onClick=loadXMLDoc('cmd/D/2/0/0/0','status')>Switch 2 on</button>
-	  <button onClick=loadXMLDoc('cmd/D/2/1/0/0','status')>Switch 2 off</button>	
+	  <button onClick=loadXMLDoc('cmd/D&1&0&0&0','status')>Switch 1 on</button>
+	  <button onClick=loadXMLDoc('cmd/D&1&1&0&0','status')>Switch 1 off</button>
+	  <button onClick=loadXMLDoc('cmd/D&2&0&0&0','status')>Switch 2 on</button>
+	  <button onClick=loadXMLDoc('cmd/D&2&1&0&0','status')>Switch 2 off</button>	
 	
 	</div>
 <div id='status'>
