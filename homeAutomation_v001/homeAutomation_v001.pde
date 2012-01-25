@@ -60,7 +60,7 @@ boolean sw_state[] = {false, false, false, false};
 int akkuspannungpin = 1;   
 int spannung = 1000;       
 int debouncecount = 0;     
-int debouncecount_lim = 12000;  // command 4
+int debouncecount_lim = 11000;  // command 4
 int sw1_up_lim = 580;      // command 5
 int sw2_up_lim = 700;       // command 6
 int sw1_sw2_up_lim = 0;    // command 7
@@ -71,7 +71,7 @@ boolean sw_activ = true;    // command 8
 void setup()
 {
   // start serial port at 9600 bps:
-  Serial.begin(9600);
+  Serial.begin(57600);
   
   // VFD
   initVFD();

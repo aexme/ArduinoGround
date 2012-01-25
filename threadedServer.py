@@ -5,7 +5,6 @@ import sys
 import serial
 import time
 from datetime import datetime
-import pprint
 import datetime
 from mpd import (MPDClient, CommandError)
 from socket import error as SocketError
@@ -13,8 +12,10 @@ import SocketServer
 import threading 
 import thread
 import ConfigParser
-import csv
 import urllib
+import scipy
+import numpy
+import scipy.fftpack
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -22,6 +23,19 @@ PASSWORD = False
 ##
 CON_ID = {'host':HOST, 'port':PORT}
 iRadioURL = {1:'',2:'',3:'',4:'',5:'',6:''}
+
+iRadio_cfg = '/root/iradio.cfg'
+alarm_cfg = '/root/alarm.cfg'
+htdocs = "/root/htdocs/"
+#ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
+#bufferSize=2**14
+bufferSize=2**9
+
+# ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
+sampleRate=44100
+
+chunks=[]
+ffts=[]
 
 class MyArduino():
     def __init__(self):
@@ -31,7 +45,7 @@ class MyArduino():
 
 	for device in locations:
 	  try:
-	    self.arduino = serial.Serial(device, 9600)
+	    self.arduino = serial.Serial(device, 57600)
 	    self.arduino.timeout = 0 
 	    print "Connected on",device
 	    break
@@ -59,7 +73,7 @@ class IRadio():
 	self.loadList()
 	
     def loadList(self):
-	iradioFile = open('iradio.cfg', 'r')
+	iradioFile = open(iRadio_cfg, 'r')
 
 	for line in iradioFile:
 	    timerLine = line.split(';')
@@ -81,7 +95,7 @@ class IRadio():
 	self.iradioList[_id] = pls
 	
     def writeConfig(self):
-	iradioFile = open('iradio.cfg', 'w')
+	iradioFile = open(iRadio_cfg, 'w')
 	for _id, url in self.iradioList.iteritems():
 	    if (url == ' ' or url == "\n" or url == '' ):
 		print "not again!"
@@ -134,7 +148,7 @@ class MyTimer():
 	self.loadTimer()
 	
     def loadTimer(self):
-	timerFile = open('alarm.cfg', 'r')
+	timerFile = open(alarm_cfg, 'r')
 
 	for line in timerFile:
 	    timerLine = line.split(';')
@@ -154,7 +168,7 @@ class MyTimer():
 	self.timerList[timerSplit[0]] = timer
 	
     def writeConfig(self):
-	timerFile = open('alarm.cfg', 'w')
+	timerFile = open(alarm_cfg, 'w')
 	for name, line in self.timerList.iteritems():
 	    if (line == ' ' or line == "\n" or line == '' ):
 		print "not again!"
@@ -475,9 +489,9 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    
 	    self.request.send(s)
 	
-	elif os.path.exists("/home/aex/sketchbook/htdocs/" + command[1]):
+	elif os.path.exists(htdocs + command[1]):
 	      print "+ Attempting to serve "+ self.unixpath1 +"\n"
-	      file = open("/home/aex/sketchbook/htdocs/"  + command[1], "r")
+	      file = open(htdocs  + command[1], "r")
 	      
 	      self.request.send( responsePrefix )
 	      self.request.send("Content-Type: text/html\r\n")
@@ -517,6 +531,8 @@ class myAlarm(threading.Thread):   #deine Threadklasse
       print "noch daa"
 
 def main():
+      global w,fftx,ffty
+      print "STARTING!"
       
       arduino = MyArduino()
       mympdClient = MyMPDClient()
@@ -542,6 +558,32 @@ def main():
       loadingsymbol = 32
       vfdON = True
       
+      defWert = 4
+      j=0
+      b=[]
+      m=[]
+      h=[]
+      values_nummber=30
+      values_nummber_div3 = 10
+      while j<values_nummber:
+	   b.append(defWert)
+	   m.append(defWert)
+	   h.append(defWert)
+	   j+=1
+      
+      max_value_b=5
+      min_value_b=1
+      max_value_m=5
+      min_value_m=1
+      max_value_h=5
+      min_value_h=1
+      max_value=5
+      min_value=1
+      
+      value_cnt=0
+      i=2
+      fp = open('/tmp/mpd.fifo',"rb")
+      
       # VFD leeren
       cnt = 0
       while cnt<41:
@@ -550,14 +592,8 @@ def main():
       
       while True:
 	
-	    time.sleep(0.1)
-	    if vfdTimer>3: vfdTimer=0
-	    if vfdON==False:
-		# VFD leeren
-		cnt = 0
-		while cnt<41:
-		    arduino.write('C' + chr(cnt) + chr(0) +'00')  
-		    cnt = cnt + 1
+	    time.sleep(0.001)
+	    if vfdTimer>10: vfdTimer=0
 	    
 	    if vfdTimer == 0 and vfdON == True:
 		mpd_currentSong = mympdClient.getCurrentsong()
@@ -596,6 +632,7 @@ def main():
 		else: loadingsymbol = 32
 		
 	    vfdTimer+=1
+	    
 	    arduinoMessage = arduino.read().split(';')
 
 	    if(arduinoMessage[0] == "RF"):
@@ -626,7 +663,12 @@ def main():
 		    playIradio(iradio, mympdClient, '6')
 		elif(arduinoMessage[1] == "123146"):
 		    if not vfdON:	writeVfdMessage(arduino, ' VFD ON ')
-		    else: 		writeVfdMessage(arduino, 'VFD OFF ')
+		    else: 		
+			writeVfdMessage(arduino, 'VFD OFF ')
+			cnt = 0
+			while cnt<41:
+			    arduino.write('C' + chr(cnt) + chr(0) +'00')  
+			    cnt = cnt + 1
 		    vfdON = not vfdON
 		elif(arduinoMessage[1] == "123144"):
 		    writeVfdMessage(arduino, '  STOP  ')
@@ -679,8 +721,15 @@ def main():
 		    print "got vfd keyPower"
 		elif(arduinoMessage[1] == "DSP"):
 		    if not vfdON:	writeVfdMessage(arduino, ' VFD ON ')
-		    else: 	writeVfdMessage(arduino, 'VFD OFF ')
+		    else:
+			writeVfdMessage(arduino, 'VFD OFF ')		      	    
+			# VFD leeren
+			cnt = 0
+			while cnt<41:
+			    arduino.write('C' + chr(cnt) + chr(0) +'00')  
+			    cnt = cnt + 1
 		    vfdON = not vfdON
+		      
 		elif(arduinoMessage[1] == "MODE"):
 		    print "got vfd keyMODE"
 		elif(arduinoMessage[1] == "EQ"):
@@ -691,7 +740,6 @@ def main():
 		elif(arduinoMessage[1] == "8"):
 		    mympdClient.previous()
 		    writeVfdMessage(arduino, '  PREV  ')
-		    print "got vfd key8"
 		elif(arduinoMessage[1] == "BAND"):
 		    mympdClient.stop()
 		    writeVfdMessage(arduino, '  STOP  ')
@@ -699,10 +747,11 @@ def main():
 		    mympdClient._next()
 		    writeVfdMessage(arduino, '  NEXT  ')  
 		time.sleep(0.5)
-	    if(counterAlarm > 45):	counterAlarm=0
-	    else: 			counterAlarm += 0.1
+		
+	    if(counterAlarm > 4500):	counterAlarm=0
+	    else: 			counterAlarm += 1
 	    
-	    if(counterAlarm==0):
+	    if(counterAlarm == 0):
 		my_timerList = timer.getTimer()
 		
 		for name, mytimer in my_timerList.iteritems():
@@ -732,9 +781,47 @@ def main():
 			  ma_AlarmThread = myAlarm()
 			  ma_AlarmThread.start()
 			  print 'ALARM'
+			  
+	    if vfdON == True:
+		[b[i],m[i],h[i]] = getFFT(fp)
+		#print [b[i],m[i],h[i]]
+		
+		if i==values_nummber_div3:
+		    max_value = max( [ numpy.max( b[ 1:len(b)-1] ), numpy.max( m[1: len(m)-1] ), numpy.max( h[1: len(h)-1 ] ) ] )
+		
+		if i==values_nummber_div3*2:
+		    min_value = min( [ numpy.min( b[ 1:len(b)-1] ), numpy.min( m[1: len(m)-1] ), numpy.min( h[1: len(h)-1 ] ) ] )
+				
+		if i>values_nummber-2:
+		    b[0] = b[i]
+		    #b[1] = b[i]
+		    b[len(b)-1]=b[i-1]
+		    m[0] = m[i]
+		    #m[1] = m[i]
+		    m[len(m)-1]=m[i-1]
+		    h[0] = h[i]
+		    #h[1] = h[i]
+		    h[len(h)-1]=h[i-1]
+		    
+		    i = 1
+		    
+		b[i] = scipy.average(b[i-1:i+1])
+		bass = encodeFFT(b[i], max_value, min_value)
+		m[i] = scipy.average(m[i-1:i+1])
+		mid  = encodeFFT(m[i], max_value, min_value)
+		h[i] = scipy.average(h[i-1:i+1])
+		hig  = encodeFFT(h[i], max_value, min_value)
+		
+		#print str(b[i]) + " "+  str(m[i]) + " " + str(h[i]) 
+		arduino.write('C' + chr(0) + chr(hig) +'00')  
+		arduino.write('C' + chr(3) + chr(mid) +'00')  
+		arduino.write('C' + chr(6) + chr(bass) +'00')
+		
+		i+=1
+		value_cnt +=1
 
       myServer.shutdown()
-      
+      fp.close()
 ##  Channell C  ##
 
 #E10	118122
@@ -773,6 +860,7 @@ def main():
 #E00	124602
 #E01	124604
 
+
 def mpdConnect(client, con_id):
     """
     Simple wrapper to connect MPD .
@@ -802,6 +890,66 @@ def playIradio(iradio, mympdClient, _id):
 	      
 	  itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
 	  if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
+
+def getFFT(fp):
+        global chunks, bufferSize, fftx,ffty, w
+        b=0
+        m=0
+        h=0
+        
+	data = numpy.fromfile(fp, dtype='h', count=bufferSize*2)
+
+	ffty=numpy.fft.rfft(data)
+	fftx=numpy.fft.fftfreq(bufferSize*2, 1.0/sampleRate)
+	fftx=fftx[0:len(fftx)/4]
+	ffty=abs(ffty[0:len(ffty)/2])
+	#ffty1=ffty[:len(ffty)/2]
+	#ffty2=ffty[len(ffty)/2::]+2
+	#ffty2=ffty2[::-1]
+	#ffty=ffty1+ffty2
+	#ffty=scipy.log(ffty)-2
+	i=0
+	while fftx[i]<120:
+	    i+=1
+	basspart = i
+	while fftx[i]<1000:
+	    i+=1
+	midpart = i
+	
+	if basspart>1: b = numpy.max(ffty[1:basspart])
+	else: b = 0
+
+	if midpart>basspart: m = numpy.max(ffty[basspart:midpart])
+	else: m = 0
+
+	if len(ffty)>midpart: h = numpy.max(ffty[midpart:len(ffty)])
+	else: h = 0
+                
+        #print '#### bass' + str(b) + '#### mid' + str(m) + '#### treble' + str(h)       
+	return [b,m,h]
+
+def encodeFFT(word, max_value, min_value):
+	diff_value = max_value-min_value
+	tmp = diff_value / 35
+	wrt=0
+	
+	if word > (max_value - tmp):
+	  wrt= 127
+	elif word > (min_value + (33 * tmp)):
+	  wrt= 63
+	elif word > (min_value + (28 * tmp)):
+	  wrt= 31
+	elif word > (min_value + (24 * tmp)):
+	  wrt= 15
+	elif word > (min_value + (18 * tmp)):
+	  wrt= 7
+	elif word > (min_value + (10 * tmp)):
+	    wrt= 3
+	elif word >= min_value:
+	    wrt= 1
+	
+	#print "wert " + str(word) + " max " + str(max_value) + " min " + str(min_value) + " tmp " + str(tmp) + " return " + str(wrt)	
+	return wrt
 
 def encodeVFDMessage(message):
     message = message.upper()
@@ -958,6 +1106,37 @@ def deltaTime(interval)  :
     for i in range(len(x))  :
         y[i] -= x[i]
     return y
+
+#if __name__ == "__main__":
+#    main()
     
 if __name__ == "__main__":
-    main()
+    # do the UNIX double-fork magic, see Stevens' "Advanced 
+    # Programming in the UNIX Environment" for details (ISBN 0201563177)
+    try: 
+        pid = os.fork() 
+        if pid > 0:
+            # exit first parent
+            sys.exit(0) 
+    except OSError, e: 
+        print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror) 
+        sys.exit(1)
+
+    # decouple from parent environment
+    os.chdir("/") 
+    os.setsid() 
+    os.umask(0) 
+
+    # do second fork
+    try: 
+        pid = os.fork() 
+        if pid > 0:
+            # exit from second parent, print eventual PID before
+            print "Daemon PID %d" % pid 
+            sys.exit(0) 
+    except OSError, e: 
+        print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror) 
+        sys.exit(1) 
+
+    # start the daemon main loop
+    main() 
