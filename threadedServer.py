@@ -27,9 +27,13 @@ iRadioURL = {1:'',2:'',3:'',4:'',5:'',6:''}
 iRadio_cfg = '/root/iradio.cfg'
 alarm_cfg = '/root/alarm.cfg'
 htdocs = "/root/htdocs/"
+#iRadio_cfg = '/home/aex/sketchbook/iradio.cfg'
+#alarm_cfg = '/home/aex/sketchbook/alarm.cfg'
+#htdocs = "/home/aex/sketchbook/htdocs/"
 #ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
 #bufferSize=2**14
 bufferSize=2**9
+PCMData = []
 
 # ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
 sampleRate=44100
@@ -527,9 +531,25 @@ class myAlarm(threading.Thread):   #deine Threadklasse
       arduino.write('EC300')
       
       exit()
+    
+class readFIFO(threading.Thread):   #deine Threadklasse
+   def __init__(self, fp): #musst du initialisieren
+      self.lock=thread.allocate_lock()
+      threading.Thread.__init__ (self)  #hier reicht die Methode der Threadklasse
+      self.fp=fp
+      self.PCMData = []
+      self.enabled = True
       
-      print "noch daa"
-
+   def run(self):             # die Methode, die beim Aufruf von start abgearbeitet wird
+      #fp = open('/tmp/mpd.fifo',"rb")
+      while self.enabled==True:
+	  self.lock.acquire() 
+	  self.PCMData = numpy.fromfile(self.fp, dtype='h', count=bufferSize*2)
+	  self.lock.release()
+	  time.sleep(0.005)
+      exit()
+      
+      
 def main():
       global w,fftx,ffty
       print "STARTING!"
@@ -582,17 +602,23 @@ def main():
       
       value_cnt=0
       i=2
+      
       fp = open('/tmp/mpd.fifo',"rb")
+      ma_readFIFOThread = readFIFO(fp)
+      
+      ma_AlarmThread = myAlarm()
+      ma_readFIFOThread.start()
       
       # VFD leeren
       cnt = 0
       while cnt<41:
 	  arduino.write('C' + chr(cnt) + chr(0) +'00')  
 	  cnt = cnt + 1                              
-      
-      while True:
+      try:
+	  
+	while True:
 	
-	    time.sleep(0.001)
+	    time.sleep(0.01)
 	    if vfdTimer>10: vfdTimer=0
 	    
 	    if vfdTimer == 0 and vfdON == True:
@@ -777,13 +803,12 @@ def main():
 			      
 		for alarmTime in myAlarmTime:
 		      
-		      if  (time.strftime("%H:%M", time.localtime(int(alarmTime)-300)) == time.strftime("%H:%M", time.localtime())):		            
-			  ma_AlarmThread = myAlarm()
+		      if  (time.strftime("%H:%M", time.localtime(int(alarmTime)-300)) == time.strftime("%H:%M", time.localtime())):		            			  
 			  ma_AlarmThread.start()
 			  print 'ALARM'
 			  
 	    if vfdON == True:
-		[b[i],m[i],h[i]] = getFFT(fp)
+		[b[i],m[i],h[i]] = getFFT(ma_readFIFOThread.PCMData)
 		#print [b[i],m[i],h[i]]
 		
 		if i==values_nummber_div3:
@@ -819,9 +844,13 @@ def main():
 		
 		i+=1
 		value_cnt +=1
+      except (KeyboardInterrupt, SystemExit):
+	  myServer.shutdown()
+	  fp.close()
+	  ma_readFIFOThread.enabled=False
+	  ma_readFIFOThread.join()
+	  sys.exit()
 
-      myServer.shutdown()
-      fp.close()
 ##  Channell C  ##
 
 #E10	118122
@@ -891,15 +920,12 @@ def playIradio(iradio, mympdClient, _id):
 	  itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
 	  if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
 
-def getFFT(fp):
+def getFFT(PCMData):
         global chunks, bufferSize, fftx,ffty, w
         b=0
         m=0
         h=0
-        
-	data = numpy.fromfile(fp, dtype='h', count=bufferSize*2)
-
-	ffty=numpy.fft.rfft(data)
+	ffty=numpy.fft.rfft(PCMData)
 	fftx=numpy.fft.fftfreq(bufferSize*2, 1.0/sampleRate)
 	fftx=fftx[0:len(fftx)/4]
 	ffty=abs(ffty[0:len(ffty)/2])
