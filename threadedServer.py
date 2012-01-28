@@ -16,6 +16,7 @@ import urllib
 import scipy
 import numpy
 import scipy.fftpack
+import Queue 
 
 HOST = '192.168.200.18'
 PORT = '6600'
@@ -27,9 +28,10 @@ iRadioURL = {1:'',2:'',3:'',4:'',5:'',6:''}
 iRadio_cfg = '/root/iradio.cfg'
 alarm_cfg = '/root/alarm.cfg'
 htdocs = "/root/htdocs/"
-#iRadio_cfg = '/home/aex/sketchbook/iradio.cfg'
-#alarm_cfg = '/home/aex/sketchbook/alarm.cfg'
-#htdocs = "/home/aex/sketchbook/htdocs/"
+iRadio_cfg = '/home/aex/sketchbook/iradio.cfg'
+alarm_cfg = '/home/aex/sketchbook/alarm.cfg'
+htdocs = "/home/aex/sketchbook/htdocs/"
+
 #ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
 #bufferSize=2**14
 bufferSize=2**9
@@ -41,35 +43,53 @@ sampleRate=44100
 chunks=[]
 ffts=[]
 
-class MyArduino():
+class MyArduino(threading.Thread):
+   
     def __init__(self):
+	threading.Thread.__init__ (self)
 	locations=['/dev/ttyUSB0','/dev/ttyUSB1','/dev/ttyUSB2','/dev/ttyUSB3',
 	    '/dev/ttyS0','/dev/ttyS1','/dev/ttyS2','/dev/ttyS3']
 	self.lock=thread.allocate_lock()
-
+	self.msgs = Queue.Queue()
+	self.enabled = True
+	
 	for device in locations:
 	  try:
 	    self.arduino = serial.Serial(device, 57600)
-	    self.arduino.timeout = 0 
+	    self.arduino.timeout = 1 
 	    print "Connected on",device
 	    break
 	  except:
 	    print "Failed to connect on",device
+    
+    def run(self):             # die Methode, die beim Aufruf von start abgearbeitet wird
+	while self.enabled==True:
+	    time.sleep(0.005)
+	    data = self.arduino.readline()
+
+	    if len(data)==0:
+		pass
+	    else:
+		dataSplit = str(data).split(';')
+		if len(dataSplit)>1:
+		    i=0
+		    while i<len(dataSplit)-1:
+			self.msgs.put(dataSplit[i] + ';' + dataSplit[i+1])
+			i+=2
+	exit()
 	
     def write(self, text):
       self.lock.acquire() 
       self.arduino.write(text)
       self.lock.release()
-      
-    def read(self):
-      data = self.arduino.read(9999)
-
-      if len(data) > 7:
-        return data
-      else: return ''
-
-      return 
-
+    
+    def getMsg(self):
+      try: 
+	  msg=str(self.msgs.get_nowait())
+	  print msg
+	  return msg
+      except Queue.Empty:
+	  return ' '	  
 class IRadio():
     
     def __init__(self):
@@ -140,8 +160,7 @@ class IRadio():
 		
       f.close()
       return items
-	  
-	
+	  	
 class MyTimer():
   
     def __init__(self):
@@ -554,7 +573,9 @@ def main():
       global w,fftx,ffty
       print "STARTING!"
       
-      arduino = MyArduino()
+      arduino = MyArduino()      
+      arduino.start()
+      
       mympdClient = MyMPDClient()
       lock=thread.allocate_lock()
       timer = MyTimer()
@@ -603,10 +624,10 @@ def main():
       value_cnt=0
       i=2
       
-      fp = open('/tmp/mpd.fifo',"rb")
-      ma_readFIFOThread = readFIFO(fp)
-      
       ma_AlarmThread = myAlarm()
+      
+      fp = open('/tmp/mpd.fifo',"rb")
+      ma_readFIFOThread = readFIFO(fp)      
       ma_readFIFOThread.start()
       
       # VFD leeren
@@ -658,8 +679,7 @@ def main():
 		else: loadingsymbol = 32
 		
 	    vfdTimer+=1
-	    
-	    arduinoMessage = arduino.read().split(';')
+	    arduinoMessage = arduino.getMsg().split(';')
 
 	    if(arduinoMessage[0] == "RF"):
 		time.sleep(0.2)
@@ -847,6 +867,9 @@ def main():
       except (KeyboardInterrupt, SystemExit):
 	  myServer.shutdown()
 	  fp.close()
+	  arduino.enabled=False
+	  arduino.exit()	 
+	  arduino.join()
 	  ma_readFIFOThread.enabled=False
 	  ma_readFIFOThread.join()
 	  sys.exit()
@@ -1133,8 +1156,8 @@ def deltaTime(interval)  :
         y[i] -= x[i]
     return y
 
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()
     
 if __name__ == "__main__":
     # do the UNIX double-fork magic, see Stevens' "Advanced 

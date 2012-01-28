@@ -48,7 +48,8 @@ byte pulse_width = B00000011;  //0-7 Brightness
 int key1pin = 4;   
 int key2pin = 5; 
 int encpin = 3; 
-
+int key1=0;
+int key2=0;
 //******************
 
 // RF Link
@@ -438,57 +439,78 @@ void getKeys(){
     spannung2 = analogRead(key2pin);
     spannung3 = analogRead(encpin);
 
-    if(spannung1 < 250 && spannung1 > 220){
-          Serial.println("VFDkey;TA;");
+    if(spannung1 < 250 && spannung1 > 220){	 
+          if (key1!=1) Serial.println("VFDkey;TA;");
+	  key1=1;
     }
-    if(spannung1 < 350 && spannung1 > 320){
-          Serial.println("VFDkey;PTY;");
+    else if(spannung1 < 350 && spannung1 > 320){
+          if (key1!=2) Serial.println("VFDkey;PTY;");
+	  key1=2;
     }
-    if(spannung1 < 170 && spannung1 > 130){
-          Serial.println("VFDkey;AF;");
+    else if(spannung1 < 170 && spannung1 > 130){
+          if (key1!=3) Serial.println("VFDkey;AF;");
+	  key1=3;
     }    
-    if(spannung1 < 110 && spannung1 > 70){
-          Serial.println("VFDkey;Power;");
+    else if(spannung1 < 110 && spannung1 > 70){
+          if (key1!=4) Serial.println("VFDkey;Power;");
+	  key1=4;
     }
-    if(spannung1 < 65 && spannung1 > 20){
-          Serial.println("VFDkey;DSP;");
+    else if(spannung1 < 65 && spannung1 > 20){
+          if (key1!=5) Serial.println("VFDkey;DSP;");
+	  key1=5;
     }
-    if(spannung1 < 460 && spannung1 > 420){
-          Serial.println("VFDkey;MODE;");
+    else if(spannung1 < 460 && spannung1 > 420){
+          if (key1!=6) Serial.println("VFDkey;MODE;");
+	  key1=6;
     }
-    if(spannung1 < 900 && spannung1 > 860){
-          Serial.println("VFDkey;EQ;");
+    else if(spannung1 < 900 && spannung1 > 860){
+          if (key1!=7) Serial.println("VFDkey;EQ;");
+	  key1=7;
     }
-    if(spannung1 < 820 && spannung1 > 780){
-          Serial.println("VFDkey;SCN;");
+    else if(spannung1 < 820 && spannung1 > 780){
+          if (key1!=8) Serial.println("VFDkey;SCN;");
+	  key1=8;
     }  
-    if(spannung2 < 20){
-          Serial.println("VFDkey;1;");
+    else if(spannung2 < 20){
+          if (key2!=1) Serial.println("VFDkey;1;");
+	  key2=1;
     } 
-    if(spannung2 < 185 && spannung2 > 150){
-          Serial.println("VFDkey;2;");
+    else if(spannung2 < 185 && spannung2 > 150){
+          if (key2!=2) Serial.println("VFDkey;2;");
+	  key2=2;
     } 
-    if(spannung2 < 340 && spannung2 > 315){
-          Serial.println("VFDkey;3;");
+    else if(spannung2 < 340 && spannung2 > 315){
+          if (key2!=3) Serial.println("VFDkey;3;");
+	  key2=3;
     } 
-    if(spannung2 < 500 && spannung2 > 470){
-          Serial.println("VFDkey;4;");
+    else if(spannung2 < 500 && spannung2 > 470){
+          if (key2!=4) Serial.println("VFDkey;4;");
+	  key2=4;
     } 
-    if(spannung2 < 645 && spannung2 > 615){
-          Serial.println("VFDkey;5;");
+    else if(spannung2 < 645 && spannung2 > 615){
+          if (key2!=5) Serial.println("VFDkey;5;");
+	  key2=5;
     } 
-    if(spannung2 < 765 && spannung2 > 730){
-          Serial.println("VFDkey;6;");
+    else if(spannung2 < 765 && spannung2 > 730){
+          if (key2!=6) Serial.println("VFDkey;6;");
+	  key2=6;
     } 
-    if(spannung2 < 1015 && spannung2 > 985){
-          Serial.println("VFDkey;8;");
+    else if(spannung2 < 1015 && spannung2 > 985){
+          if (key2!=7) Serial.println("VFDkey;8;");
+	  key2=7;
     } 
-    if(spannung2 < 870 && spannung2 > 840){
-          Serial.println("VFDkey;BAND;");
+    else if(spannung2 < 870 && spannung2 > 840){
+          if (key2!=8) Serial.println("VFDkey;BAND;");
+	  key2=8;
     } 
-     if(spannung2 < 955 && spannung2 > 925){
-          Serial.println("VFDkey;9;");
-    } 
+    else if(spannung2 < 955 && spannung2 > 925){
+          if (key2!=9) Serial.println("VFDkey;9;");
+	  key2=9;
+    }
+    else{
+          key1=0;
+          key2=0;
+    }
 }
 
 void setVFD(byte addr, byte data){
