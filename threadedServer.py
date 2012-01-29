@@ -28,9 +28,9 @@ iRadioURL = {1:'',2:'',3:'',4:'',5:'',6:''}
 iRadio_cfg = '/root/iradio.cfg'
 alarm_cfg = '/root/alarm.cfg'
 htdocs = "/root/htdocs/"
-iRadio_cfg = '/home/aex/sketchbook/iradio.cfg'
-alarm_cfg = '/home/aex/sketchbook/alarm.cfg'
-htdocs = "/home/aex/sketchbook/htdocs/"
+#iRadio_cfg = '/home/aex/sketchbook/iradio.cfg'
+#alarm_cfg = '/home/aex/sketchbook/alarm.cfg'
+#htdocs = "/home/aex/sketchbook/htdocs/"
 
 #ADJUST THIS TO CHANGE SPEED/SIZE OF FFT
 #bufferSize=2**14
@@ -47,21 +47,21 @@ class MyArduino(threading.Thread):
    
     def __init__(self):
 	threading.Thread.__init__ (self)
-	locations=['/dev/ttyUSB0','/dev/ttyUSB1','/dev/ttyUSB2','/dev/ttyUSB3',
+	self.locations=['/dev/ttyUSB0','/dev/ttyUSB1','/dev/ttyUSB2','/dev/ttyUSB3',
 	    '/dev/ttyS0','/dev/ttyS1','/dev/ttyS2','/dev/ttyS3']
 	self.lock=thread.allocate_lock()
 	self.msgs = Queue.Queue()
 	self.enabled = True
-	
-	for device in locations:
+
+    def connectSerial(self):
+	for device in self.locations:
 	  try:
 	    self.arduino = serial.Serial(device, 57600)
 	    self.arduino.timeout = 1 
-	    print "Connected on",device
-	    break
+	    return True
 	  except:
-	    print "Failed to connect on",device
-    
+	    return False
+ 
     def run(self):             # die Methode, die beim Aufruf von start abgearbeitet wird
 	while self.enabled==True:
 	    time.sleep(0.005)
@@ -86,10 +86,10 @@ class MyArduino(threading.Thread):
     def getMsg(self):
       try: 
 	  msg=str(self.msgs.get_nowait())
-	  print msg
 	  return msg
       except Queue.Empty:
-	  return ' '	  
+	  return ' '
+    
 class IRadio():
     
     def __init__(self):
@@ -101,7 +101,7 @@ class IRadio():
 
 	for line in iradioFile:
 	    timerLine = line.split(';')
-	    if (line!=''):		
+	    if (line!=''):
 		self.iradioList[timerLine[0]] = timerLine[1]
 
 	iradioFile.close()
@@ -207,11 +207,9 @@ class MyTimer():
 	if(repeat - 64 >= 0):
 	    repeatDays['So'] = 1
 	    repeat -=64  
-
 	if(repeat-32 >= 0):
 	    repeatDays['Sa'] = 1
 	    repeat -=32
-	    
 	if(repeat-16 >= 0):
 	    repeatDays['Fr'] = 1
 	    repeat -=16
@@ -331,7 +329,7 @@ class MyRequestHandler(SocketServer.BaseRequestHandler):
 	    if self.unixpath1 == "/1.1":
 		self.unixpath1 = "/index.html"      
 	  
-	if command[1] == "": command[1] = "index.html"	 
+	if command[1] == "": command[1] = "index.html"
 
 	if command[1] == "cmd":
 	    if len(command)>2: parameter = command[2].split('&')
@@ -574,6 +572,10 @@ def main():
       print "STARTING!"
       
       arduino = MyArduino()      
+      while arduino.connectSerial() == False:
+	  print "connecting Arduino"
+	  time.sleep(0.01)
+	  
       arduino.start()
       
       mympdClient = MyMPDClient()
@@ -932,16 +934,30 @@ def playIradio(iradio, mympdClient, _id):
     
     url = iradio.getIRadio(_id)
     items = iradio.parsePLS(url)
-    itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
-    if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
+    try:
+	itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
+    except Exception as inst:
+	print "error getting MPD Playlist Item id"
+    
+    if itemIdInPlaylist!='-1': 
+	try:
+	    mympdClient.playId(int(itemIdInPlaylist))
+	except Exception as inst:
+	    print "error starting Item URL"
     else:
 	  i=1
 	  while i <= len(items):
 	      mympdClient.add(items[i])
 	      i+=1
-	      
-	  itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
-	  if itemIdInPlaylist!='-1': mympdClient.playId(int(itemIdInPlaylist))
+	  try:
+	      itemIdInPlaylist = mympdClient.getItemIdInPLaylist(items[1])
+	  except Exception as inst:
+	      print "error getting MPD Playlist Item id"
+	  if itemIdInPlaylist!='-1': 
+	      try:
+		  mympdClient.playId(int(itemIdInPlaylist))
+	      except Exception as inst:
+		  print "error starting Item URL"	    
 
 def getFFT(PCMData):
         global chunks, bufferSize, fftx,ffty, w
@@ -952,16 +968,16 @@ def getFFT(PCMData):
 	fftx=numpy.fft.fftfreq(bufferSize*2, 1.0/sampleRate)
 	fftx=fftx[0:len(fftx)/4]
 	ffty=abs(ffty[0:len(ffty)/2])
-	#ffty1=ffty[:len(ffty)/2]
-	#ffty2=ffty[len(ffty)/2::]+2
-	#ffty2=ffty2[::-1]
-	#ffty=ffty1+ffty2
-	#ffty=scipy.log(ffty)-2
 	i=0
 	while fftx[i]<120:
 	    i+=1
 	basspart = i
-	while fftx[i]<1000:
+	
+	tmp=1000
+	
+	if len(fftx)<1000: tmp = len(fftx)-1
+	
+	while fftx[i]<tmp:
 	    i+=1
 	midpart = i
 	
@@ -1156,8 +1172,8 @@ def deltaTime(interval)  :
         y[i] -= x[i]
     return y
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
     
 if __name__ == "__main__":
     # do the UNIX double-fork magic, see Stevens' "Advanced 
